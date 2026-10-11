@@ -10,7 +10,7 @@
     main { max-width: 900px; margin: auto; }
     h1 { margin-bottom: 8px; }
     .intro { color: #526078; margin-bottom: 24px; }
-    form, .page { background: white; border: 1px solid #d6dde7; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+    form, .page, .detections { background: white; border: 1px solid #d6dde7; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
     label { display: block; font-weight: 600; margin-bottom: 12px; }
     input { display: block; max-width: 100%; font: inherit; }
     .hint { color: #526078; font-size: 14px; }
@@ -20,6 +20,9 @@
     #error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
     #summary { overflow-wrap: anywhere; }
     .page h2 { margin-top: 0; font-size: 20px; }
+    .detections h2 { margin-top: 0; font-size: 20px; }
+    .detections li { margin-bottom: 12px; overflow-wrap: anywhere; }
+    .detections ul { padding-left: 24px; }
     pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 15px/1.6 system-ui, sans-serif; margin-bottom: 0; }
   </style>
 </head>
@@ -40,6 +43,16 @@
     <section id="results" aria-label="Extracted document text" hidden>
       <h2 id="summary"></h2>
       <div id="pages"></div>
+      <section class="detections" aria-labelledby="sections-heading">
+        <h2 id="sections-heading">Detected Sections</h2>
+        <ul id="detected-sections"></ul>
+        <p id="no-sections" hidden>No section headings detected.</p>
+      </section>
+      <section class="detections" aria-labelledby="references-heading">
+        <h2 id="references-heading">Section References</h2>
+        <ul id="section-references"></ul>
+        <p id="no-references" hidden>No explicit section references detected.</p>
+      </section>
     </section>
   </main>
 
@@ -52,6 +65,10 @@
     const results = document.getElementById("results");
     const summary = document.getElementById("summary");
     const pages = document.getElementById("pages");
+    const detectedSections = document.getElementById("detected-sections");
+    const sectionReferences = document.getElementById("section-references");
+    const noSections = document.getElementById("no-sections");
+    const noReferences = document.getElementById("no-references");
     const maxFileSize = 10 * 1024 * 1024;
 
     function showError(message) {
@@ -64,6 +81,8 @@
       error.hidden = true;
       results.hidden = true;
       pages.replaceChildren();
+      detectedSections.replaceChildren();
+      sectionReferences.replaceChildren();
       summary.textContent = "";
       status.textContent = "";
 
@@ -106,8 +125,20 @@
           section.append(heading, text);
           pages.append(section);
         }
+        for (const section of data.sections) {
+          const item = document.createElement("li");
+          item.textContent = `Section ${section.number} — ${section.title} (Page ${section.page})`;
+          detectedSections.append(item);
+        }
+        for (const reference of data.references) {
+          const item = document.createElement("li");
+          item.textContent = `Section ${reference.number} (Page ${reference.page}) — “${reference.text}”`;
+          sectionReferences.append(item);
+        }
+        noSections.hidden = data.sections.length > 0;
+        noReferences.hidden = data.references.length > 0;
         results.hidden = false;
-        status.textContent = "Text extraction complete.";
+        status.textContent = "Text extraction and section detection complete.";
       } catch (failure) {
         showError(failure instanceof TypeError ? "Could not connect to the server. Check that the application is running and try again." : failure.message);
         status.textContent = "";

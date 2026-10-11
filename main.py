@@ -4,6 +4,8 @@ import pymupdf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from detection import detect_sections_and_references
+
 app = FastAPI(title="Legal Reviewer")
 BASE_DIR = Path(__file__).resolve().parent
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB, matching the browser's limit.
@@ -53,6 +55,7 @@ def analyze_document(file: UploadFile | None = File(default=None)):
                 detail="This PDF has no extractable text. It may contain scanned images. Please upload a PDF with selectable text.",
             )
 
-        return {"filename": filename, "total_pages": len(pages), "pages": pages}
+        detections = detect_sections_and_references(pages)
+        return {"filename": filename, "total_pages": len(pages), "pages": pages, **detections}
     finally:
         file.file.close()
