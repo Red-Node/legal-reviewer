@@ -35,6 +35,19 @@ def is_heading_title(title):
     )
 
 
+def reference_excerpt(text, start, end, reference_start):
+    """Keep a short piece of the original page around a reference number."""
+    # Use the line containing the label, including wrapped reference numbers.
+    line_start = text.rfind("\n", 0, reference_start) + 1
+    line_end = text.find("\n", end)
+    if line_end == -1:
+        line_end = len(text)
+    excerpt_start = max(line_start, start - 60)
+    excerpt_end = min(line_end, end + 60)
+    excerpt = " ".join(text[excerpt_start:excerpt_end].split())
+    return ("…" if excerpt_start > line_start else "") + excerpt + ("…" if excerpt_end < line_end else "")
+
+
 def detect_sections_and_references(pages):
     """Return separate lists with section numbers, matching text, and PDF pages.
 
@@ -69,12 +82,48 @@ def detect_sections_and_references(pages):
             # The "Section 2.1" label of an actual heading is not a reference.
             if any(start <= match.start() < end for start, end in heading_spans):
                 continue
-            numbers = match["single"] or match["group"]
-            for number in re.findall(NUMBER, numbers):
+            group = "single" if match["single"] else "group"
+            for number_match in re.finditer(NUMBER, match[group]):
+                start = match.start(group) + number_match.start()
+                end = match.start(group) + number_match.end()
                 references.append({
-                    "number": number,
+                    "number": number_match.group(),
                     "text": match.group(),
                     "page": page["number"],
+                    "excerpt": reference_excerpt(text, start, end, match.start()),
                 })
 
     return {"sections": sections, "references": references}
+
+
+def validate_references(sections, references):
+    """Compare exact number strings against headings from the whole document.
+
+    Missing targets are potential errors because heading detection can miss text.
+    Keep every occurrence, including repeated references on the same page.
+    """
+    if not sections:
+        return {
+            "broken_references": [],
+            "validation_warning": (
+                "No section headings were detected. Reference validation is unreliable, "
+                "so potential broken references could not be determined."
+            ),
+        }
+
+    section_numbers = {section["number"] for section in sections}
+    broken_references = []
+    for reference in references:
+        # Strings preserve exact identifiers: "2.1" differs from "2.10" and "2".
+        if reference["number"] not in section_numbers:
+            broken_references.append({
+                **reference,
+                "excerpt": reference.get("excerpt", reference["text"]),
+                "status": "Not found",
+                "explanation": (
+                    f"No heading numbered {reference['number']} was detected in this document. "
+                    "The heading may have been missed; this is a potential error."
+                ),
+            })
+
+    return {"broken_references": broken_references, "validation_warning": None}

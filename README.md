@@ -2,14 +2,15 @@
 
 A minimal PDF text reader built with Python, FastAPI, PyMuPDF, and plain HTML,
 CSS, and JavaScript. It extracts text by page and uses deterministic rules to
-detect numbered section headings and explicit section references.
+detect numbered section headings and explicit section references, then flag
+references whose targets were not found among recognized headings.
 
 ## Files
 
 - `main.py`: serves the webpage and handles PDF uploads and text extraction.
-- `detection.py`: identifies section headings and explicit references using text patterns.
+- `detection.py`: identifies headings and references, then compares exact section numbers.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
-- `test_detection.py`: tests synthetic contract text and checks that PDF uploads still work.
+- `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -73,8 +74,31 @@ Upload it and click **Analyze Document**. Below the extracted pages, you should
 see three **Detected Sections** (2.1, 2.2, 3.4) and four **Section References**
 (9.4, 2.1, 3.1, 3.2). Each result includes its PDF page number. The heading labels
 themselves should not appear as references, and the amounts should not appear
-as headings. A missing target such as 9.4 is simply listed; this version does
-not check whether a referenced section exists.
+as headings. **Potential Broken References** should list 9.4, 3.1, and 3.2
+with their page numbers, original text excerpts, a “Not found” status, and an
+explanation. These are potential errors because a heading may have been missed.
+
+## Test potential broken references
+
+The app first collects headings from **all pages**, then checks each reference.
+Section numbers must match exactly: 2.1 does not match 2.10, 2.01, or 2.
+Repeated missing references are listed separately to preserve every page location.
+
+Try these variations of the sample PDF:
+
+1. Add standalone headings `Section 9.4 General Terms`, `Section 3.1 Disclosure`,
+   and `Section 3.2 Permitted Uses`. Upload the new PDF. You should see
+   “No broken references detected among recognized sections.”
+2. Put those added headings on a later page. References to them should still pass.
+3. Replace `Section 9.4 General Terms` with `Section 9.40 General Terms`.
+   The reference to 9.4 should show “Not found” because the numbers differ.
+4. Repeat `See Section 9.4.` on two pages while its heading is absent.
+   Both page locations should appear in the potential broken references list.
+5. Remove all numbered headings but keep the reference sentences. You should
+   see a warning that validation is unreliable, with no references labeled broken.
+   The existing **Section References** list should still show the references.
+
+After editing the PDF, upload the updated file and click **Analyze Document** again.
 
 To run the automated tests, activate your virtual environment and run this
 command from the project folder:
@@ -105,6 +129,9 @@ The tests create sample PDF data in memory; no test documents are stored.
   Lettered subsections, numeric ranges, and references split across pages are not supported.
 - Detection uses text patterns, not PDF font sizes or legal meaning. Ambiguous
   text and table-of-contents entries can resemble headings. Repeated occurrences
-  are kept, and referenced targets are not validated.
+  are kept. Validation only checks targets against recognized headings; it does
+  not prove that a reference is legally correct or incorrect. Missed headings can
+  cause false warnings, and unrelated or table-of-contents headings may hide a
+  missing target. If no headings are recognized, validation is skipped with a warning.
 
 There is no AI, legal analysis, editing, database, or external API integration.

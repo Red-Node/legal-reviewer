@@ -22,7 +22,9 @@
     .page h2 { margin-top: 0; font-size: 20px; }
     .detections h2 { margin-top: 0; font-size: 20px; }
     .detections li { margin-bottom: 12px; overflow-wrap: anywhere; }
+    .detections li p { margin: 6px 0; }
     .detections ul { padding-left: 24px; }
+    .validation-warning { padding: 16px; border-radius: 6px; background: #fff3d6; color: #714d00; }
     pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 15px/1.6 system-ui, sans-serif; margin-bottom: 0; }
   </style>
 </head>
@@ -53,6 +55,13 @@
         <ul id="section-references"></ul>
         <p id="no-references" hidden>No explicit section references detected.</p>
       </section>
+      <section class="detections" aria-labelledby="broken-references-heading">
+        <h2 id="broken-references-heading">Potential Broken References</h2>
+        <p class="hint">These are potential errors. A section heading may have been missed during text detection.</p>
+        <p id="reference-validation-warning" class="validation-warning" role="status" hidden></p>
+        <ul id="broken-references"></ul>
+        <p id="no-broken-references" hidden>No broken references detected among recognized sections.</p>
+      </section>
     </section>
   </main>
 
@@ -69,6 +78,9 @@
     const sectionReferences = document.getElementById("section-references");
     const noSections = document.getElementById("no-sections");
     const noReferences = document.getElementById("no-references");
+    const brokenReferences = document.getElementById("broken-references");
+    const validationWarning = document.getElementById("reference-validation-warning");
+    const noBrokenReferences = document.getElementById("no-broken-references");
     const maxFileSize = 10 * 1024 * 1024;
 
     function showError(message) {
@@ -83,6 +95,10 @@
       pages.replaceChildren();
       detectedSections.replaceChildren();
       sectionReferences.replaceChildren();
+      brokenReferences.replaceChildren();
+      validationWarning.textContent = "";
+      validationWarning.hidden = true;
+      noBrokenReferences.hidden = true;
       summary.textContent = "";
       status.textContent = "";
 
@@ -137,8 +153,22 @@
         }
         noSections.hidden = data.sections.length > 0;
         noReferences.hidden = data.references.length > 0;
+        for (const reference of data.broken_references) {
+          const item = document.createElement("li");
+          const label = document.createElement("strong");
+          label.textContent = `Section ${reference.number} (Page ${reference.page}) — ${reference.status}`;
+          const excerpt = document.createElement("p");
+          excerpt.textContent = `“${reference.excerpt}”`;
+          const explanation = document.createElement("p");
+          explanation.textContent = reference.explanation;
+          item.append(label, excerpt, explanation);
+          brokenReferences.append(item);
+        }
+        validationWarning.textContent = data.validation_warning || "";
+        validationWarning.hidden = !data.validation_warning;
+        noBrokenReferences.hidden = Boolean(data.validation_warning) || data.broken_references.length > 0;
         results.hidden = false;
-        status.textContent = "Text extraction and section detection complete.";
+        status.textContent = "Text extraction and reference checks complete.";
       } catch (failure) {
         showError(failure instanceof TypeError ? "Could not connect to the server. Check that the application is running and try again." : failure.message);
         status.textContent = "";
