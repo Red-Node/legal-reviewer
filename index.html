@@ -16,6 +16,10 @@
     .hint { color: #526078; font-size: 14px; }
     button { border: 0; border-radius: 6px; padding: 12px 20px; background: #2457b5; color: white; font: inherit; cursor: pointer; }
     button:disabled { opacity: 0.6; cursor: wait; }
+    .review-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    .review-actions button:disabled { cursor: not-allowed; }
+    .review-actions .reject-button { background: #922020; }
+    .review-actions .pending-button { background: #526078; }
     button:focus-visible, input:focus-visible { outline: 3px solid #7da9f8; outline-offset: 4px; }
     #error, #ai-error, #real-error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
     .verified { color: #185b35; background: #e7f5ec; }
@@ -49,6 +53,15 @@
     <p id="error" role="alert" hidden></p>
     <section id="results" aria-label="Extracted document text" hidden>
       <h2 id="summary"></h2>
+      <section class="detections" aria-labelledby="review-heading">
+        <h2 id="review-heading">Review Findings</h2>
+        <p class="hint">Accept or reject each potential issue explicitly. Evidence verification and human decisions are separate. Verified text does not confirm a legal interpretation.</p>
+        <p class="validation-warning">Decisions are kept only in browser memory and are lost after a page reload or a new upload. Demo findings are synthetic test results.</p>
+        <p id="review-counts" role="status" aria-live="polite"></p>
+        <p id="review-decision-status" role="status" aria-live="polite"></p>
+        <p id="review-empty">No review findings yet. Existing rule-based checks are shown below; AI findings appear after an explicit AI review.</p>
+        <ul id="review-findings"></ul>
+      </section>
       <div id="pages"></div>
       <h2>Rule-based Checks</h2>
       <section class="detections" aria-labelledby="sections-heading">
@@ -111,6 +124,7 @@
     </section>
   </main>
 
+  <script src="/review.js"></script>
   <script>
     const form = document.getElementById("upload-form");
     const fileInput = document.getElementById("pdf-file");
@@ -148,6 +162,11 @@
     const realError = document.getElementById("real-error");
     const realMessage = document.getElementById("real-message");
     const realFindings = document.getElementById("real-findings");
+    const reviewState = ReviewDashboard.createReview();
+    const reviewList = document.getElementById("review-findings");
+    const reviewCounts = document.getElementById("review-counts");
+    const reviewEmpty = document.getElementById("review-empty");
+    const reviewDecisionStatus = document.getElementById("review-decision-status");
     const localDevelopment = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
     // Only memory is used. A new upload/selection or page reload clears this state.
     let currentPages = null;
@@ -155,6 +174,9 @@
     let realController = null;
 
     function resetDemo() {
+      reviewState.reset();
+      reviewDecisionStatus.textContent = "";
+      renderReviewDashboard();
       currentPages = null;
       if (demoController) demoController.abort();
       demoController = null;
@@ -190,6 +212,56 @@
       element.textContent = text;
       element.className = className;
       return element;
+    }
+
+    function renderReviewDashboard() {
+      reviewList.replaceChildren();
+      const counts = reviewState.counts();
+      reviewCounts.textContent = `Total findings: ${counts.total} · To review: ${counts.pending} · Accepted: ${counts.accepted} · Rejected: ${counts.rejected}`;
+      reviewEmpty.hidden = counts.total > 0;
+      const sourceLabels = {rules: "Rule-based checks", demo: "Demo AI (synthetic)", real: "Real Claude AI"};
+      for (const finding of reviewState.findings()) {
+        const item = document.createElement("li");
+        const heading = document.createElement("h3");
+        heading.textContent = `${finding.category} — ${finding.title}`;
+        item.append(heading, paragraph(`ID: ${finding.id} · Source: ${sourceLabels[finding.source]}`),
+          paragraph(finding.explanation));
+        const evidenceList = document.createElement("ul");
+        for (const evidence of finding.evidence) {
+          const quote = document.createElement("li");
+          quote.append(paragraph(`Page ${evidence.page} — “${evidence.quote}”`));
+          if (finding.source !== "rules") {
+            quote.append(paragraph(`Quote verification: ${evidence.verificationStatus}`,
+              `verification-status ${evidence.verificationStatus === "verified" ? "verified" : "verification_failed"}`));
+            if (evidence.failureReason) quote.append(paragraph(evidence.failureReason));
+          }
+          evidenceList.append(quote);
+        }
+        item.append(evidenceList, paragraph(finding.source === "rules" ?
+          "Evidence verification: not applied (rule-based extracted text)." : `Overall evidence verification: ${finding.verificationStatus}`),
+          paragraph(`Human decision: ${finding.decision}`));
+        const actions = document.createElement("div");
+        actions.className = "review-actions";
+        for (const [label, decision] of [["Accept", "accepted"], ["Reject", "rejected"], ["Mark pending", "pending"]]) {
+          const action = document.createElement("button");
+          action.type = "button";
+          action.textContent = label;
+          action.setAttribute("aria-label", `${label} finding ${finding.id}`);
+          action.className = decision === "rejected" ? "reject-button" : decision === "pending" ? "pending-button" : "";
+          action.disabled = decision === "accepted" && !ReviewDashboard.canAccept(finding);
+          action.addEventListener("click", () => {
+            if (reviewState.decide(finding.id, decision)) {
+              renderReviewDashboard();
+              reviewDecisionStatus.textContent = `Finding ${finding.id}: ${decision}.`;
+            }
+          });
+          actions.append(action);
+        }
+        item.append(actions);
+        if (!ReviewDashboard.canAccept(finding)) item.append(paragraph(
+          "Accept is unavailable because supporting evidence did not pass verification. You may reject this finding or leave it pending.", "validation-warning"));
+        reviewList.append(item);
+      }
     }
 
     function renderFindings(findings, list) {
@@ -240,6 +312,7 @@
         return;
       }
       const reviewPages = currentPages;
+      const reviewToken = reviewState.token();
       realController = new AbortController();
       realButton.disabled = true;
       realError.hidden = true;
@@ -253,14 +326,16 @@
           signal: realController.signal,
         });
         const data = await response.json();
-        if (reviewPages !== currentPages) return;
+        if (reviewPages !== currentPages || reviewToken !== reviewState.token()) return;
         if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Real review failed. No automatic retry was made.");
         if (data.mode !== "real" || !Array.isArray(data.findings)) throw new Error("Invalid real review response. No automatic retry was made.");
         realMessage.textContent = data.message;
         renderFindings(data.findings, realFindings);
+        reviewState.replaceSource("real", ReviewDashboard.aiFindings(data.findings), reviewToken);
+        renderReviewDashboard();
         realStatus.textContent = data.findings.length ? "Real Claude review complete." : "Claude returned no findings. This does not establish that the contract has no issues.";
       } catch (failure) {
-        if (reviewPages !== currentPages || failure.name === "AbortError") return;
+        if (reviewPages !== currentPages || reviewToken !== reviewState.token() || failure.name === "AbortError") return;
         realFindings.replaceChildren();
         realMessage.textContent = "";
         realError.textContent = failure instanceof TypeError || failure instanceof SyntaxError ?
@@ -268,7 +343,7 @@
         realError.hidden = false;
         realStatus.textContent = "";
       } finally {
-        if (reviewPages === currentPages) {
+        if (reviewPages === currentPages && reviewToken === reviewState.token()) {
           realButton.disabled = false;
           realController = null;
         }
@@ -278,6 +353,7 @@
     aiButton.addEventListener("click", async () => {
       if (!currentPages || aiButton.disabled) return;
       const reviewPages = currentPages;
+      const reviewToken = reviewState.token();
       demoController = new AbortController();
       aiButton.disabled = true;
       aiError.hidden = true;
@@ -291,14 +367,16 @@
           signal: demoController.signal,
         });
         const data = await response.json();
-        if (reviewPages !== currentPages) return;
+        if (reviewPages !== currentPages || reviewToken !== reviewState.token()) return;
         if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Demo review failed. Please try again.");
         if (data.mode !== "mock" || !Array.isArray(data.findings)) throw new Error("Unexpected demo response. Please try again.");
         aiMessage.textContent = data.message;
         renderFindings(data.findings, aiFindings);
+        reviewState.replaceSource("demo", ReviewDashboard.aiFindings(data.findings), reviewToken);
+        renderReviewDashboard();
         aiStatus.textContent = data.findings.length ? "Demo review complete." : "Demo review complete — no mock findings for this document.";
       } catch (failure) {
-        if (reviewPages !== currentPages || failure.name === "AbortError") return;
+        if (reviewPages !== currentPages || reviewToken !== reviewState.token() || failure.name === "AbortError") return;
         aiFindings.replaceChildren();
         aiMessage.textContent = "";
         aiError.textContent = failure instanceof TypeError ? "Could not connect to the local server. Please try again." :
@@ -306,7 +384,7 @@
         aiError.hidden = false;
         aiStatus.textContent = "";
       } finally {
-        if (reviewPages === currentPages) {
+        if (reviewPages === currentPages && reviewToken === reviewState.token()) {
           aiButton.disabled = false;
           demoController = null;
         }
@@ -334,6 +412,7 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       resetDemo();
+      const uploadReviewToken = reviewState.token();
       error.hidden = true;
       results.hidden = true;
       pages.replaceChildren();
@@ -376,6 +455,7 @@
       try {
         const response = await fetch("/analyze", { method: "POST", body: formData });
         const data = await response.json();
+        if (uploadReviewToken !== reviewState.token()) return;
         if (!response.ok) {
           throw new Error(typeof data.detail === "string" ? data.detail : "The document could not be read. Please try another PDF.");
         }
@@ -438,6 +518,8 @@
           data.candidate_term_uses.length === 0 || data.potentially_undefined_terms.length > 0;
         results.hidden = false;
         currentPages = data.pages;
+        reviewState.replaceSource("rules", ReviewDashboard.ruleFindings(data), uploadReviewToken);
+        renderReviewDashboard();
         showRealControls(currentPages);
         status.textContent = "Document processing complete.";
       } catch (failure) {

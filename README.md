@@ -6,6 +6,8 @@ detect numbered section headings and explicit section references, then flag
 references whose targets were not found among recognized headings. It also detects
 explicit term definitions and candidate uses of capitalized multi-word terms,
 then flags potential issues when a complete term's definition was not found.
+The browser review dashboard combines rule-based and AI findings for explicit
+human Accept / Reject decisions, kept in memory for the current review only.
 
 ## Files
 
@@ -16,6 +18,8 @@ then flags potential issues when a complete term's definition was not found.
 - `quote_verifier.py`: independently checks evidence quotes against their claimed original pages, entirely offline.
 - `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
+- `review.js`: manages unified finding IDs, human decisions, evidence acceptance checks, and counters in browser memory.
+- `test_review.py`: runs offline JavaScript state and UI event-handler tests using Node.js.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
 - `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
 - `test_ai_reviewer.py`: tests configuration, contract analysis, and response validation with a mocked client.
@@ -177,7 +181,10 @@ definition. The app does not establish that a term is definitively undefined.
 ## Run automated tests
 
 To run the automated tests, activate your virtual environment and run this
-command from the project folder:
+command from the project folder. The review dashboard tests also require Node.js
+18 or newer installed locally (`node --version` checks this). Node.js is needed
+only to run these JavaScript tests; the application still runs with Python and
+plain browser JavaScript:
 
 ```sh
 python -m unittest -v
@@ -473,8 +480,8 @@ errors, and independent requests. Demo JSON requests have a 10 MB size limit.
 
 Limitations: the mock results are fixed, so this does not test Claude's reasoning
 or analyze arbitrary contracts. Verification still confirms quote presence only,
-with the whitespace and extraction limitations described above. No human
-Accept / Reject / Edit workflow is implemented.
+with the whitespace and extraction limitations described above. No Edit workflow
+is implemented. Milestone 5A below adds Accept / Reject decisions.
 
 ## Real Claude preparation, disabled by default (Milestone 4D-2A)
 
@@ -560,7 +567,91 @@ still apply. The timeout is an SDK timeout, not a guarantee of a strict overall
 wall-clock deadline. There is no persistent document storage, but a future
 approved real request will disclose text to Anthropic. Real model behavior, model
 availability, and costs have not been tested here. Quote presence does not establish
-legal correctness. No Accept / Reject / Edit workflow is implemented.
+legal correctness. Milestone 5A below adds Accept / Reject decisions; no Edit
+workflow is implemented.
+
+## Human review dashboard (Milestone 5A)
+
+After a successful upload, **Review Findings** appears above the extracted pages.
+It combines potential broken references, potentially undefined terms, and AI
+contradiction/ambiguity findings after you explicitly run an AI review. Existing
+result sections remain visible. Each item shows a stable ID for this review, its
+source (rule-based, synthetic demo AI, or real Claude), category, title, explanation,
+page numbers, supporting text, and evidence verification where applicable.
+
+All findings start **pending**. Click **Accept** or **Reject** to record your own
+decision. You can change that decision, or use **Mark pending** to return an item
+to the review queue. The **Total findings**, **To review**, **Accepted**, and
+**Rejected** counters update immediately. No decision is sent to a server, and
+clicking a decision button never calls Claude.
+
+AI evidence verification and human review are separate. AI findings with failed
+or unverified evidence cannot be accepted; the Accept button is disabled with an
+explanation, and the JavaScript decision function also rejects acceptance. They
+remain available for rejection or further review. Rule-based findings show that
+quote verification was not applied; they remain potential issues for your judgment.
+A verified quote alone never accepts a finding or establishes legal correctness.
+
+**Everything is kept in browser memory only.** Reloading the page, selecting
+another file, or starting a new upload clears all findings and decisions, even
+when reuploading the same PDF. Old AI responses are ignored after a new review
+starts. IDs are unique and stable within the current review, not permanent IDs.
+Rerunning the same AI mode replaces its batch without accumulating duplicates:
+identical findings retain their IDs and decisions, while changed findings become
+new pending items. Demo and real results have independent decisions. A failed
+rerun leaves the last successful batch in the dashboard.
+
+Test without spending API credits:
+
+1. Start the app with real AI disabled for this process (this does not edit `.env`):
+
+   ```sh
+   source .venv/bin/activate
+   ENABLE_REAL_AI=false python -m uvicorn main:app --host 127.0.0.1 --port 8000
+   ```
+
+2. Open http://127.0.0.1:8000/ and reload to load the new frontend. Download and
+   upload the synthetic demo PDF, then click **Analyze with AI (Demo)**.
+3. Scroll to **Review Findings**. Expect three pending items and counters
+   **Total: 3**, **To review: 3**, **Accepted: 0**, **Rejected: 0**.
+4. Accept the payment contradiction and reject the intentionally invented-evidence
+   finding. Expect **To review: 1**, **Accepted: 1**, **Rejected: 1**. The invented
+   evidence item's Accept button remains disabled, even after rejection.
+5. Reject the previously accepted item, then accept it again or mark it pending.
+   Confirm the ID stays the same and the counters follow your decisions.
+6. Run the demo again. Unchanged findings keep their IDs and decisions, and the
+   total stays three. No real Claude button is needed for this test.
+7. To test rule-based review, create a PDF with this text using TextEdit → Print
+   → PDF → Save as PDF, then upload it:
+
+   ```text
+   Section 1.1 Payment
+   "Business Day" means a day other than Saturday or Sunday.
+   The Notice Period ends tomorrow.
+   See Section 9.4.
+   ```
+
+   The dashboard should show two new pending rule-based issues (Section 9.4 and
+   Notice Period). Prior demo findings and decisions must be gone. These entries
+   can be accepted or rejected, with their original excerpts and pages visible.
+8. Reload the page to confirm that decisions and uploaded results disappear.
+
+Run all automated tests with Node.js 18+ available and the Python environment active:
+
+```sh
+node --version
+python -m unittest -v
+```
+
+`test_review.py` runs the actual JavaScript module and HTML event handlers with
+synthetic data, a small DOM stand-in, and mocked fetch responses. No server or
+external network is needed for these tests; existing Anthropic tests remain mocked.
+
+Limitations: decisions have no permanent storage or audit history, and independent
+tabs do not share them. There is no counsel letter, export, Edit control, or email
+sending. Accepted demo findings are still synthetic test results. Findings from
+different sources are kept separate, so related rule and AI issues may appear
+more than once. IDs and decisions are not suitable for permanent records yet.
 
 ## Limits and document handling
 

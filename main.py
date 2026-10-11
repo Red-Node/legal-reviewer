@@ -23,6 +23,11 @@ def home():
     return FileResponse(BASE_DIR / "index.html")
 
 
+@app.get("/review.js")
+def review_script():
+    return FileResponse(BASE_DIR / "review.js", media_type="application/javascript")
+
+
 @app.get("/demo-contract.pdf")
 def download_demo_contract():
     """Generate the synthetic fixture in memory; no file is saved by the server."""
