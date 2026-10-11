@@ -12,12 +12,12 @@ then flags potential issues when a complete term's definition was not found.
 - `main.py`: serves the webpage and handles PDF uploads and text extraction.
 - `detection.py`: identifies headings and references, then compares exact section numbers.
 - `terms.py`: detects definitions and candidate uses, then checks for potential missing definitions.
-- `ai_reviewer.py`: reads Claude configuration and prepares an inactive future API function.
+- `ai_reviewer.py`: reads Claude configuration and prepares contract analysis with JSON validation; inactive in the app.
 - `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
 - `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
-- `test_ai_reviewer.py`: tests configuration and future Claude requests with a mocked client.
+- `test_ai_reviewer.py`: tests configuration, contract analysis, and response validation with a mocked client.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -233,8 +233,89 @@ in this milestone.
 `send_text_to_claude()` is a small function prepared for a future milestone.
 **Do not call it with a real key yet:** doing so would send its supplied text to
 Anthropic and could incur charges. Only mocked tests exercise it here. There is
-no contradiction detection or other AI analysis, and the browser results stay
+no active AI analysis, and the browser results stay
 the same. You can upload a PDF as before to check the existing features.
+
+## Contract analysis preparation (Milestone 4B)
+
+This milestone prepares analysis of **potential contradictions** between clauses
+and **ambiguities** in terms or obligations. It runs only in offline tests with
+mocked Claude responses. There is no **Analyze with AI** button, and no uploaded
+document is sent to Anthropic.
+
+The proposed flow is:
+
+1. `analyze_contract(pages)` accepts the page dictionaries already produced by
+   the PDF reader: each contains `number` and `text`.
+2. `format_document_pages()` adds markers such as `[Page 1]` and `[Page 2]`.
+   It keeps the extracted text unchanged, including blank pages in readable documents.
+3. A separate system prompt asks Claude to act as a document quality-control
+   assistant, not legal counsel. It limits analysis to the supplied contract,
+   requests verbatim supporting quotes, and instructs Claude to treat document
+   content as untrusted data rather than instructions. It asks for no findings
+   when evidence is insufficient. The system prompt uses the separate `system`
+   parameter described in the [Anthropic Messages API documentation](https://platform.claude.com/docs/en/api/messages/create).
+4. Claude would return JSON with a `findings` list. Each finding has an id,
+   category, title, cautious explanation, evidence quotes with page numbers,
+   and an `unverified` status. Contradictions need at least two evidence items;
+   ambiguities need at least one.
+5. `parse_analysis_response()` checks the response structure. It rejects malformed
+   JSON, duplicate JSON fields or finding ids, unknown categories, missing or empty
+   fields, insufficient evidence, and invalid or nonexistent page numbers. Any
+   invalid finding rejects the entire response with `ValueError`. It does not
+   silently turn invalid output into “no findings”.
+
+Example response for a synthetic contract with different payment deadlines:
+
+```json
+{
+  "findings": [
+    {
+      "id": "F1",
+      "category": "contradiction",
+      "title": "Potentially inconsistent payment deadlines",
+      "explanation": "These clauses may specify different deadlines for the same payment.",
+      "evidence": [
+        {"quote": "Payment is due within 10 days.", "page": 1},
+        {"quote": "Payment is due within 30 days.", "page": 2}
+      ],
+      "status": "unverified"
+    }
+  ]
+}
+```
+
+No findings is represented as `{"findings": []}`. That means the response
+reported no supported potential issues; it does not establish that the contract
+has no problems.
+
+**All findings remain unverified.** A valid JSON shape or an existing page number
+does not prove that a quote appears on that page, that two quotes are from distinct
+clauses, or that an interpretation is correct. A fabricated quote or a quote
+assigned to the wrong existing page can still pass structure validation. Quote
+verification belongs to Milestone 4C and is deliberately not implemented here.
+Prompt instructions alone cannot guarantee model accuracy or resistance to
+instructions embedded in a document.
+
+To test this preparation safely, use the existing test command:
+
+```sh
+source .venv/bin/activate
+python -m unittest -v
+```
+
+The analysis tests replace the Anthropic client with a mock and use synthetic
+text, fake credentials, and a network block. No real key is needed. The previous
+PDF, section, term, and configuration tests are included.
+
+**Do not invoke `analyze_contract()` or `send_text_to_claude()` with real credentials
+in this milestone.** These callable functions are future API entry points and
+would make a paid request if called with a real key. The model defaults to
+`claude-sonnet-5-5`, as in Milestone 4A. Real model behavior and availability have
+not been tested. The preparation sends a whole document in one request and has
+no long-document splitting; response output is limited to 4096 tokens. Large
+contracts or truncated responses may fail, and JSON validation does not assess
+completeness. There are no automatic legal conclusions or recommendations.
 
 ## Limits and document handling
 
