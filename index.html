@@ -62,6 +62,17 @@
         <ul id="broken-references"></ul>
         <p id="no-broken-references" hidden>No broken references detected among recognized sections.</p>
       </section>
+      <section class="detections" aria-labelledby="defined-terms-heading">
+        <h2 id="defined-terms-heading">Defined Terms</h2>
+        <ul id="defined-terms"></ul>
+        <p id="no-defined-terms" hidden>No explicit term definitions detected.</p>
+      </section>
+      <section class="detections" aria-labelledby="candidate-term-uses-heading">
+        <h2 id="candidate-term-uses-heading">Candidate Term Uses</h2>
+        <p class="hint">Capitalized phrases detected in the text. Candidate uses do not indicate an error.</p>
+        <ul id="candidate-term-uses"></ul>
+        <p id="no-candidate-term-uses" hidden>No candidate term uses detected.</p>
+      </section>
     </section>
   </main>
 
@@ -81,11 +92,28 @@
     const brokenReferences = document.getElementById("broken-references");
     const validationWarning = document.getElementById("reference-validation-warning");
     const noBrokenReferences = document.getElementById("no-broken-references");
+    const definedTerms = document.getElementById("defined-terms");
+    const candidateTermUses = document.getElementById("candidate-term-uses");
+    const noDefinedTerms = document.getElementById("no-defined-terms");
+    const noCandidateTermUses = document.getElementById("no-candidate-term-uses");
     const maxFileSize = 10 * 1024 * 1024;
 
     function showError(message) {
       error.textContent = message;
       error.hidden = false;
+    }
+
+    function renderTerms(terms, list, emptyMessage) {
+      for (const term of terms) {
+        const item = document.createElement("li");
+        const label = document.createElement("strong");
+        label.textContent = `${term.term} (Page ${term.page})`;
+        const excerpt = document.createElement("p");
+        excerpt.textContent = `“${term.excerpt}”`;
+        item.append(label, excerpt);
+        list.append(item);
+      }
+      emptyMessage.hidden = terms.length > 0;
     }
 
     form.addEventListener("submit", async (event) => {
@@ -96,6 +124,8 @@
       detectedSections.replaceChildren();
       sectionReferences.replaceChildren();
       brokenReferences.replaceChildren();
+      definedTerms.replaceChildren();
+      candidateTermUses.replaceChildren();
       validationWarning.textContent = "";
       validationWarning.hidden = true;
       noBrokenReferences.hidden = true;
@@ -167,8 +197,10 @@
         validationWarning.textContent = data.validation_warning || "";
         validationWarning.hidden = !data.validation_warning;
         noBrokenReferences.hidden = Boolean(data.validation_warning) || data.broken_references.length > 0;
+        renderTerms(data.defined_terms, definedTerms, noDefinedTerms);
+        renderTerms(data.candidate_term_uses, candidateTermUses, noCandidateTermUses);
         results.hidden = false;
-        status.textContent = "Text extraction and reference checks complete.";
+        status.textContent = "Document processing complete.";
       } catch (failure) {
         showError(failure instanceof TypeError ? "Could not connect to the server. Check that the application is running and try again." : failure.message);
         status.textContent = "";

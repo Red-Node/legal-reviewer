@@ -3,14 +3,17 @@
 A minimal PDF text reader built with Python, FastAPI, PyMuPDF, and plain HTML,
 CSS, and JavaScript. It extracts text by page and uses deterministic rules to
 detect numbered section headings and explicit section references, then flag
-references whose targets were not found among recognized headings.
+references whose targets were not found among recognized headings. It also detects
+explicit term definitions and candidate uses of capitalized multi-word terms.
 
 ## Files
 
 - `main.py`: serves the webpage and handles PDF uploads and text extraction.
 - `detection.py`: identifies headings and references, then compares exact section numbers.
+- `terms.py`: detects quoted definitions and candidate term uses without checking for undefined terms.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
+- `test_terms.py`: tests term detection and its integration with existing PDF results.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -100,6 +103,33 @@ Try these variations of the sample PDF:
 
 After editing the PDF, upload the updated file and click **Analyze Document** again.
 
+## Test defined terms and candidate uses
+
+Create a PDF from this text:
+
+```text
+Section 2.1 Definitions
+"Investor" means any person who subscribes for Interests.
+“Closing Date” shall mean the date specified in the notice.
+"Business Day" means a day other than Saturday or Sunday.
+The Closing Date must be a Business Day.
+Payment is due on the Closing Date.
+See Section 2.1.
+```
+
+Upload it and click **Analyze Document**. The new **Defined Terms** list should
+show Investor, Closing Date, and Business Day. **Candidate Term Uses** should show
+Closing Date twice and Business Day once. Each result includes its page number
+and a short excerpt. The quoted definition labels themselves are excluded from
+candidate uses; uses of other terms inside a definition's body can still be listed.
+
+Move the usage sentences to a second page to check page numbers. You can also
+add `The Notice Period ends tomorrow.` to see a candidate that has no detected
+definition. It is only listed as a candidate; this milestone does not identify
+undefined-term errors. Existing section and cross-reference results remain visible.
+
+## Run automated tests
+
 To run the automated tests, activate your virtual environment and run this
 command from the project folder:
 
@@ -133,5 +163,15 @@ The tests create sample PDF data in memory; no test documents are stored.
   not prove that a reference is legally correct or incorrect. Missed headings can
   cause false warnings, and unrelated or table-of-contents headings may hide a
   missing target. If no headings are recognized, validation is skipped with a warning.
+- Definitions must use matching straight or curly double quotes followed by
+  “means” or “shall mean” and some definition text. Other wording such as “is
+  defined as”, single quotation marks, and term names containing numbers are not supported.
+- Candidate uses contain two to six consecutive capitalized words on one extracted
+  line. Common prefixes such as “The” are removed. Single-word uses such as Investor,
+  lowercase uses, and phrases with lowercase connecting words may be missed.
+- Proper names and headings can resemble candidate terms. Repeated occurrences
+  are kept; definition meanings, scope, and whether a candidate is undefined are
+  not checked. PDF formatting and page breaks can affect detection. Excerpts keep
+  original words and punctuation while joining whitespace and truncating long context.
 
 There is no AI, legal analysis, editing, database, or external API integration.
