@@ -13,11 +13,13 @@ then flags potential issues when a complete term's definition was not found.
 - `detection.py`: identifies headings and references, then compares exact section numbers.
 - `terms.py`: detects definitions and candidate uses, then checks for potential missing definitions.
 - `ai_reviewer.py`: reads Claude configuration and prepares contract analysis with JSON validation; inactive in the app.
+- `quote_verifier.py`: independently checks evidence quotes against their claimed original pages, entirely offline.
 - `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
 - `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
 - `test_ai_reviewer.py`: tests configuration, contract analysis, and response validation with a mocked client.
+- `test_quote_verifier.py`: tests exact quote presence, failures, whitespace, and repeated occurrences.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -289,11 +291,11 @@ No findings is represented as `{"findings": []}`. That means the response
 reported no supported potential issues; it does not establish that the contract
 has no problems.
 
-**All findings remain unverified.** A valid JSON shape or an existing page number
+**The AI parser leaves all findings unverified.** A valid JSON shape or an existing page number
 does not prove that a quote appears on that page, that two quotes are from distinct
 clauses, or that an interpretation is correct. A fabricated quote or a quote
 assigned to the wrong existing page can still pass structure validation. Quote
-verification belongs to Milestone 4C and is deliberately not implemented here.
+verification is a separate offline step implemented in Milestone 4C below.
 Prompt instructions alone cannot guarantee model accuracy or resistance to
 instructions embedded in a document.
 
@@ -316,6 +318,68 @@ not been tested. The preparation sends a whole document in one request and has
 no long-document splitting; response output is limited to 4096 tokens. Large
 contracts or truncated responses may fail, and JSON validation does not assess
 completeness. There are no automatic legal conclusions or recommendations.
+
+## Independent quote verification (Milestone 4C)
+
+`quote_verifier.py` checks whether evidence actually occurs on the claimed page
+of the **original extracted PDF text**. It needs no API key and has no network
+or Anthropic dependencies. It is not connected to the webpage yet.
+
+Pass the parsed analysis and the original `pages` list to:
+
+```python
+from quote_verifier import verify_findings
+
+verified_analysis = verify_findings(parsed_analysis, pages)
+```
+
+This call does not run AI analysis. For offline testing, `parsed_analysis` can
+come from `parse_analysis_response()` applied to a synthetic JSON response.
+Use the original page texts, not the prompt text with added page markers.
+
+For example, a quote `Payment is due within 10 days.` passes when page 1 contains
+`Payment is due\nwithin   10 days.`. The same quote fails if assigned to page 2
+when it appears only on page 1. Changing `10` to `30` or removing punctuation
+also fails.
+
+The verifier collapses runs of whitespace (including line breaks and tabs) into
+single spaces and trims surrounding whitespace. It never changes words, case,
+punctuation, or numbers. Matching is literal, with boundaries to avoid finding
+quoted words or numbers inside longer words or numbers. It never searches other
+pages to repair a wrong page assignment or combines text across pages.
+
+It returns an annotated **copy** of the analysis; it does not change the inputs:
+
+- Each evidence item keeps its original `quote` and `page`, and gains
+  `verification_status`, `failure_reason` (null when successful), and `match_count`.
+- A finding's `status` becomes `verified` only when all its evidence items pass.
+  Contradictions require at least two items; ambiguities require at least one.
+- Any failed item or insufficient evidence makes the finding's status
+  `verification_failed`. `failure_reasons` explains the problems, and the finding
+  stays in the returned list in its original order.
+- Repeated quotes report their number of matches on the claimed page, including
+  overlapping matches. No unique position or original PDF coordinate is claimed.
+
+**Verified means quote presence only.** It does not mean a contradiction is real,
+an ambiguity is legally significant, or a human has approved the finding. Any
+existing human review fields are preserved without being changed. Two evidence
+items quoting the same passage may both pass; this does not establish that they
+refer to different clauses.
+
+Known limits: verification relies on extracted text, whose layout or reading
+order may differ from the visible PDF. Hyphenated line breaks, different straight
+or curly quotes, OCR errors, and other character differences are not repaired and
+can cause a failed match. No fuzzy matching or semantic comparison is used.
+
+Run all offline tests, including the previous milestones, from the project folder:
+
+```sh
+source .venv/bin/activate
+python -m unittest -v
+```
+
+No real API calls or document transfers are involved. The AI entry points remain
+inactive in the app; do not call them with real credentials in this milestone.
 
 ## Limits and document handling
 
