@@ -21,9 +21,16 @@ class ReviewError(ValueError):
     """A static, safe message suitable for the local UI."""
 
 
+def is_public_demo_only():
+    """Public hosting always blocks paid execution; malformed flags fail closed."""
+    load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+    # Unset preserves local development. Only explicit false opts out of demo mode.
+    return os.getenv("PUBLIC_DEMO_ONLY", "false").strip().lower() != "false"
+
+
 def get_real_review_settings():
     """Return only public controls; missing flag always means disabled."""
-    load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+    public_demo = is_public_demo_only()
     try:
         limit = int(os.getenv("AI_MAX_INPUT_BYTES", "20000"))
         if limit < 1:
@@ -31,7 +38,7 @@ def get_real_review_settings():
     except ValueError:
         raise ReviewError("AI_MAX_INPUT_BYTES must be a positive integer. Real review is unavailable.") from None
     return {
-        "enabled": os.getenv("ENABLE_REAL_AI", "").strip().lower() == "true",
+        "enabled": not public_demo and os.getenv("ENABLE_REAL_AI", "").strip().lower() == "true",
         "max_input_bytes": limit,
         "max_output_tokens": REAL_MAX_OUTPUT_TOKENS,
         "timeout_seconds": REAL_TIMEOUT_SECONDS,
@@ -39,6 +46,8 @@ def get_real_review_settings():
 
 
 def _require_real_review_enabled():
+    if is_public_demo_only():
+        raise ReviewError("Real Claude review is blocked in public demo mode. No Anthropic request was made.")
     settings = get_real_review_settings()
     if not settings["enabled"]:
         raise ReviewError("Real Claude review is disabled on the server. No Anthropic request was made.")

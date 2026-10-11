@@ -29,7 +29,11 @@ of questions for counsel without any AI call or automatic email sending.
 - `test_demo_review.py`: tests the demo endpoints, sample PDF upload, and guards against all real AI calls.
 - `test_real_review.py`: tests disabled real-review safeguards and future permitted requests with fake credentials and a mocked SDK.
 - `requirements.txt`: lists the Python packages needed to run the app.
-- `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
+- `.gitignore`: excludes local files such as `.env`, `.env.local`, and `.venv` from Git.
+- `railway.json`: selects Railpack, starts the public demo server, and configures `/health`.
+- `.python-version`: selects Python 3.13 for the Railway build.
+- `.railwayignore`: excludes environment files and local environments from CLI deployment uploads.
+- `test_deployment.py`: checks public demo blocking, health, deployment configuration, and upload protections offline.
 
 ## Run locally on macOS
 
@@ -829,8 +833,8 @@ With the Python environment active and Node.js 18+ available:
 python -m unittest -v
 ```
 
-All **184 tests pass**, including the **16 counsel-draft tests** and **2 new
-Milestone 6A template tests** for accepted-only
+Milestone 6 includes **16 counsel-draft tests** and
+**2 Milestone 6A template tests** for accepted-only
 selection, latest saved edits, numbering and structure, original evidence,
 failed/unverified AI exclusions, quote rechecks, manual copy/download content,
 outdated drafts, new uploads, clipboard failures, and plain-text injection safety.
@@ -853,6 +857,154 @@ Browser verification confirmed generation, editing, and outdated-draft behavior.
 The embedded browser did not confirm a downloaded file during this milestone's
 UI check. The .txt content and filename passed offline tests; please confirm the
 actual download in your regular Mac browser using the steps above.
+
+## Railway deployment preparation (Milestone 7A)
+
+This milestone prepares deployment only. Nothing has been deployed, and no paid
+AI request is needed to build or run the public demo. Use synthetic or public
+sample PDFs only. A prominent prototype warning appears above the upload form.
+Public uploads travel to the server hosting this app even though document
+contents are not permanently saved or sent to Anthropic in demo mode.
+
+### Production configuration
+
+`railway.json` uses Railway's Railpack builder, installs the existing production
+packages from `requirements.txt`, and starts this single FastAPI service:
+
+```sh
+PUBLIC_DEMO_ONLY=true exec python -m uvicorn main:app --host 0.0.0.0 --port $PORT --no-access-log
+```
+
+Railway supplies `PORT`. Binding to `0.0.0.0` makes the service reachable through
+Railway's network. There is no development reload process, database, volume,
+frontend build, or Node.js production dependency. `.python-version` selects
+Python 3.13. The existing six pinned Python dependencies are sufficient and
+remain unchanged. Routine Uvicorn access logging is disabled; application code
+does not log document contents or API keys.
+
+The configured readiness check is **GET `/health`**, with a 60-second startup
+health-check timeout. It returns only **`{"status":"ok"}`** and no configuration,
+credentials, filename, or document data. Railway's deployment health check is a
+startup check, rather than continuous uptime monitoring.
+
+Set these variables on the Railway service before exposing it publicly:
+
+| Variable | Value | Purpose |
+| --- | --- | --- |
+| `PUBLIC_DEMO_ONLY` | `true` | Blocks all real Claude execution. The checked-in start command also forces this value. |
+| `ENABLE_REAL_AI` | `false` | Keeps the independent paid feature flag disabled too. |
+| `PORT` | Automatically supplied by Railway | Leave the platform value in place; the start command uses it. |
+
+**Do not add `ANTHROPIC_API_KEY` to the public demo service.** No key, model, or
+AI input-limit setting is required. Do not import your local `.env` into Railway.
+The deployment start command forces public demo mode even if service variables
+accidentally specify `PUBLIC_DEMO_ONLY=false` or `ENABLE_REAL_AI=true`.
+
+### How paid AI is blocked
+
+The server rejects `/ai-review-real` and `/ai-review-config` with a safe 403
+response in public demo mode, before checking host/client addresses, reading
+document content, or calling the review function. A forged localhost header,
+confirmation, or browser request cannot override the server setting. The Python
+SDK entry point also independently checks public demo mode before creating an
+Anthropic client; direct calls to real review/analysis functions are blocked.
+The mock endpoint never uses the SDK.
+
+For local development, an unset `PUBLIC_DEMO_ONLY` retains existing behavior;
+`.env.example` explicitly sets it to `false`. Only explicit `false` opts out of
+public mode when a value is supplied; malformed values fail closed. Existing
+local confirmation and `ENABLE_REAL_AI` safeguards still apply. Public-domain
+pages continue hiding local-only real-AI controls. PDF checks, the synthetic demo,
+review decisions, edits, highlighting, and counsel drafts remain available.
+
+### Future deployment steps — no deployment during this milestone
+
+When you are ready to deploy:
+
+1. Run the offline checks in your existing Python environment, with Node.js 18+
+   available for frontend tests:
+
+   ```sh
+   python -m unittest -v
+   python -m pip check
+   git check-ignore .env .env.local .env.production
+   git ls-files '.env*'
+   ```
+
+   The tracked environment-file list should contain only `.env.example`. The
+   example contains placeholders, never a real key. Review and commit/push the
+   prepared changes yourself when ready; Railway's GitHub deployment needs these
+   files in the selected repository branch. This milestone does not commit/push.
+2. In Railway, create a new **Empty Project**, then add an **Empty Service**. This
+   lets you configure variables before connecting a GitHub source.
+3. In the service's **Variables** tab set `PUBLIC_DEMO_ONLY=true` and
+   `ENABLE_REAL_AI=false`. Keep the public service free of Anthropic credentials.
+4. In **Settings → Source**, connect this GitHub repository and select the branch
+   containing the preparation changes. Authorize Railway's GitHub access if
+   prompted. Keep the root directory at the repository root.
+5. Ensure the service reads `/railway.json`, uses **Railpack**, and shows the
+   start command above and health-check path `/health`. Keep dashboard settings
+   consistent with the checked-in configuration. Deploy the staged changes.
+6. Wait for the build, startup, and health check to succeed. If dependencies fail
+   to install on Linux, inspect the build error; do not change paid-mode settings
+   or add a key to fix a build failure.
+7. Under **Settings → Networking → Public Networking**, click **Generate Domain**.
+   Use the application port corresponding to Railway's `PORT` if prompted.
+8. Open the generated HTTPS URL followed by `/health`. Expect `{"status":"ok"}`.
+   Then open the root page and confirm the prototype warning is clearly visible.
+9. Download/upload the synthetic demo PDF, run **Analyze with AI (Demo)**, accept
+   and edit a valid finding, highlight its quotes, and draft questions for counsel.
+   Check copying/downloading in a normal browser. Confirm failed evidence cannot
+   be accepted, no confidential documents were used, and real-AI controls remain
+   unavailable. Reload to confirm browser-only review data clears.
+
+For an optional local preview of the production settings (after stopping any
+server already using port 8000):
+
+```sh
+PUBLIC_DEMO_ONLY=true ENABLE_REAL_AI=false PORT=8000 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --no-access-log
+```
+
+This binds to all local network interfaces, so stop it with Control-C when done.
+Use http://127.0.0.1:8000/health and the synthetic demo for testing. No API key is
+needed. Avoid the Railway CLI upload command until deployment is intended;
+`.railwayignore` and `.gitignore` protect local environment files during future
+CLI uploads, but should never be bypassed with ignore overrides.
+
+Official documentation: [Railway configuration](https://docs.railway.com/config-as-code/reference),
+[start commands](https://docs.railway.com/deployments/start-command),
+[FastAPI deployment and public domains](https://docs.railway.com/guides/fastapi),
+[empty services and GitHub connections](https://docs.railway.com/services),
+[health checks](https://docs.railway.com/deployments/healthchecks),
+[Railpack Python configuration](https://railpack.com/languages/python), and
+[CLI ignore behavior](https://docs.railway.com/cli/up).
+
+### Test results and deployment risks
+
+All **200 offline tests pass**, including **16 new deployment tests**. These check
+health response privacy, paid-flag overrides, local/remote direct endpoint calls,
+Python entry-point guards, demo without credentials, existing public upload
+limits/checks, hidden secret file paths, production dependencies, ignore rules,
+and shell expansion of the production command against a fake executable. Tests
+mock the SDK, ignore real `.env` files, and block real network connections.
+
+Railway's Linux build, domain, HTTPS routing, and actual hosting have not been
+validated because deployment is intentionally deferred. The app has no user
+accounts, rate limiting, or protection against a sustained flood of PDF requests.
+Large/complex PDFs may use substantial CPU/memory despite the 10 MB upload limit.
+Use a small public hackathon demo and monitor hosting usage; Railway hosting may
+incur charges independently of Anthropic. `/health` does not prove every PDF
+processing path is healthy.
+
+Uploads are closed after each request, with temporary multipart files cleaned up;
+there is no permanent document storage, database, or volume. Temporary upload
+spooling and in-memory processing still occur on Railway. Hosting request metadata
+may be recorded by infrastructure even with application access logs disabled.
+Review data and drafts live only in each browser tab; reloads lose them. Download
+is an explicit user-requested local export. Do not upload confidential/personal
+legal documents or publish a tracked environment file. Only the named HTML,
+JavaScript, and synthetic PDF routes serve files; there is no project-directory
+static-file mount.
 
 ## Limits and document handling
 

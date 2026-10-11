@@ -1,0 +1,11 @@
+# Protect CLI uploads as well as GitHub deployments. Never upload a real .env.
+.env
+.env.*
+!.env.example
+.git/
+.venv/
+env/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/

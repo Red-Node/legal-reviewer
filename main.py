@@ -8,7 +8,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from ai_reviewer import (DEMO_CONTRACT_TEXT, ReviewError, format_document_pages,
-                         get_real_review_settings, review_contract_demo, review_contract_real)
+                         get_real_review_settings, is_public_demo_only,
+                         review_contract_demo, review_contract_real)
 
 from detection import detect_sections_and_references, validate_references
 from terms import detect_terms, validate_terms
@@ -16,6 +17,12 @@ from terms import detect_terms, validate_terms
 app = FastAPI(title="Legal Reviewer")
 BASE_DIR = Path(__file__).resolve().parent
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB, matching the browser's limit.
+
+
+@app.get("/health")
+def health():
+    """Readiness only: no document, environment, or credential information."""
+    return JSONResponse({"status": "ok"}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/")
@@ -67,6 +74,9 @@ async def ai_review_demo(request: Request):
 
 
 def _require_local_development(request):
+    # Check before trusting host/client addresses or reading any document content.
+    if is_public_demo_only():
+        raise HTTPException(status_code=403, detail="Real Claude review is blocked in public demo mode. No Anthropic request was made.")
     try:
         local = request.client is not None and ip_address(request.client.host).is_loopback
     except ValueError:
