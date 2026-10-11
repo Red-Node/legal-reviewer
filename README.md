@@ -7,7 +7,9 @@ references whose targets were not found among recognized headings. It also detec
 explicit term definitions and candidate uses of capitalized multi-word terms,
 then flags potential issues when a complete term's definition was not found.
 The browser review dashboard combines rule-based and AI findings for explicit
-human Accept / Reject decisions, kept in memory for the current review only.
+human Accept / Reject decisions and wording edits, kept in memory for the current
+review only. Accepted findings can be turned into an editable plain-text draft
+of questions for counsel without any AI call or automatic email sending.
 
 ## Files
 
@@ -18,7 +20,7 @@ human Accept / Reject decisions, kept in memory for the current review only.
 - `quote_verifier.py`: independently checks evidence quotes against their claimed original pages, entirely offline.
 - `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
-- `review.js`: manages unified finding IDs, human decisions, wording edits, evidence acceptance checks, counters, and exact quote matching in browser memory.
+- `review.js`: manages unified finding IDs, human decisions, wording edits, evidence acceptance checks, counters, exact quote matching, and counsel letter drafts in browser memory.
 - `test_review.py`: runs offline JavaScript state and UI event-handler tests using Node.js.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
 - `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
@@ -648,8 +650,8 @@ synthetic data, a small DOM stand-in, and mocked fetch responses. No server or
 external network is needed for these tests; existing Anthropic tests remain mocked.
 
 Limitations: decisions have no permanent storage or audit history, and independent
-tabs do not share them. There is no counsel letter, export, or email sending. Milestone 5B below adds
-wording edits and evidence highlighting. Accepted demo findings are still synthetic test results. Findings from
+tabs do not share them. Milestones 5B and 6 below add wording edits, evidence highlighting, and
+plain-text counsel drafts. No automatic email sending is implemented. Accepted demo findings are still synthetic test results. Findings from
 different sources are kept separate, so related rule and AI issues may appear
 more than once. IDs and decisions are not suitable for permanent records yet.
 
@@ -726,7 +728,7 @@ With the Python environment active and Node.js 18+ available:
 python -m unittest -v
 ```
 
-The suite has **166 passing tests**, including **17 new tests** for saving and
+Milestone 5B added **17 tests** for saving and
 canceling edits, preserving original wording and evidence, resetting acceptance,
 failed-evidence protection, page navigation, exact and repeated quote matching,
 safe plain-text rendering, and clearing state for another upload. The Anthropic
@@ -743,6 +745,114 @@ truncated rule-based excerpt or altered punctuation/hyphenation may not match;
 there is no fuzzy matching or cross-page search. Overlapping matches share one
 highlighted span, while the occurrence count reports all matches. Quote presence
 does not establish a correct legal interpretation or human acceptance.
+
+## Draft questions for counsel (Milestone 6)
+
+In **Review Findings**, click **Draft Questions for Counsel** after accepting the
+findings you want counsel to review. The app builds a draft entirely in JavaScript,
+without another Claude request. It includes the specified subject, greeting,
+introduction, one numbered clarification question per eligible accepted finding,
+a brief thank-you, and the closing **Best regards, Document Review Team**.
+Milestone 6A polishes the email template without changing eligibility or draft
+controls. The subject is **Questions Regarding Draft Agreement**. Each issue
+shows the saved title and explanation, source quotations with page references,
+and a concise, category-specific question. The template does not infer deadlines,
+legal conclusions, section numbers, or answers.
+
+Only accepted findings are eligible. Pending and rejected findings are excluded.
+The latest saved title and explanation are used; unfinished finding edits must
+be saved or canceled first. Explanations and source evidence remain separate
+internally; email quotations use quotation marks and page references. Technical
+labels and provenance stay in the dashboard and internal review state, rather
+than appearing in the email. AI evidence must have
+passed verification, and its quotes are checked again on their claimed extracted
+pages before inclusion. Contradictions require at least two passing quotes.
+Failed, unverified, incomplete, or unsupported AI findings are excluded even if
+their decision is changed to accepted outside the normal UI. Rule-based findings
+retain their original pages and excerpts. Their internal verification status
+remains separate from AI evidence verification. Section references appear when present in the
+finding wording or source excerpt; the generator does not infer extra sections.
+Demo findings remain identified in the dashboard; the email omits demo and
+verification labels, so use the demo contract only for testing.
+
+You can edit the complete email in **Editable draft email**. **Copy to Clipboard**
+copies the current text, including your manual edits. **Download .txt** saves the
+same text as `counsel-questions.txt`. No email is sent, and no email service is
+connected. If clipboard permission is unavailable, select the text and copy it
+manually with Command-C (Mac) or Control-C.
+
+When any saved finding or review decision changes, an existing draft is marked
+**Potentially outdated**. Copy and download are disabled until you regenerate.
+Manual draft edits are retained. Newly accepted findings are never silently
+added. Click **Draft Questions for Counsel** again to explicitly replace the
+current draft, including manual edits, with the latest eligible accepted findings.
+If none are eligible, a clear message appears and any previous draft is retained
+for inspection rather than replaced by an empty letter. Uploading/selecting a
+new PDF or reloading clears the draft along with the current review.
+
+### Safe browser test
+
+1. In your repository folder, activate the environment and start the server with
+   real AI execution disabled for this session. Stop an existing server with
+   Control-C first if necessary:
+
+   ```sh
+   source .venv/bin/activate
+   ENABLE_REAL_AI=false python -m uvicorn main:app --host 127.0.0.1 --port 8000
+   ```
+
+2. Open http://127.0.0.1:8000/ and reload. Download/upload the synthetic demo
+   contract, click **Analyze Document**, then **Analyze with AI (Demo)**.
+3. Click **Draft Questions for Counsel** before accepting anything. Expect a
+   message explaining that there are no accepted, eligible findings.
+4. Edit and save the payment finding's title or explanation, then accept it.
+   Reject the invented-evidence finding and leave the notice finding pending.
+5. Draft again. Expect exactly one numbered question with your saved wording and
+   both payment quotes on Page 1. Neither rejected nor pending findings belongs
+   in the draft. Confirm the professional closing and absence of technical
+   labels such as Demo AI or Reviewer-approved explanation in the email.
+6. Add a manual note in the draft textarea. Copy or download it and confirm your
+   note is present. The downloaded file should be plain text, not HTML.
+7. Accept the notice finding. Confirm the existing draft and your note remain
+   unchanged, the outdated warning appears, and copy/download are disabled.
+8. Draft again. Expect two numbered questions; your manual note is replaced only
+   by this explicit regeneration action. Editing an accepted finding likewise
+   marks the draft outdated and requires saving, accepting, and regenerating.
+9. Upload another PDF or reload. Confirm the old draft is gone. The entire test
+   uses only the free mock mode; do not click the real-Claude button.
+
+### Offline tests and limitations
+
+With the Python environment active and Node.js 18+ available:
+
+```sh
+python -m unittest -v
+```
+
+All **184 tests pass**, including the **16 counsel-draft tests** and **2 new
+Milestone 6A template tests** for accepted-only
+selection, latest saved edits, numbering and structure, original evidence,
+failed/unverified AI exclusions, quote rechecks, manual copy/download content,
+outdated drafts, new uploads, clipboard failures, and plain-text injection safety.
+The template tests also check dynamic issue wording, preservation of internal
+evidence and provenance, category-specific questions, and removal of internal
+labels. Tests mock browser requests, clipboard/download operations, and
+Anthropic calls.
+
+This is a deterministic template, so questions are generic clarification requests.
+It does not decide legal validity, invent answers, or assess the legal meaning of
+reviewer wording. You must review the final email before sharing it. Manual email
+edits are not automatically checked against findings or quotes. Drafts, findings,
+and decisions have no database, permanent record, or audit history. A .txt download
+is an explicit local export; no draft is otherwise saved to files or localStorage.
+Browser clipboard access may depend on permissions. Quote checks retain the
+existing PDF extraction and whitespace-matching limitations. Demo findings are
+for testing and should not be used as substantive counsel questions.
+
+Browser verification confirmed generation, editing, and outdated-draft behavior.
+The embedded browser did not confirm a downloaded file during this milestone's
+UI check. The .txt content and filename passed offline tests; please confirm the
+actual download in your regular Mac browser using the steps above.
 
 ## Limits and document handling
 

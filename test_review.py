@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 NODE = shutil.which("node")
 JS_SETUP = """
 const assert = require('node:assert/strict');
-const {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches} = require(REVIEW_PATH);
+const {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, buildCounselLetter, createCounselDraft} = require(REVIEW_PATH);
 const review = createReview();
 review.reset();
 const candidate = (status = 'verified') => ({
@@ -35,6 +35,8 @@ class Element {
   constructor() { this.children = []; this.textContent = ''; this.hidden = false;
     this.disabled = false; this.listeners = {}; this.files = []; this.value = '';
     this.classList = {add: name => {this.highlightClass = name;}, remove: () => {this.highlightClass = null;}}; }
+  click() { downloads.push({href: this.href, filename: this.download}); }
+  remove() { this.removed = true; }
   focus() { this.focused = true; }
   scrollIntoView() { this.scrolled = true; }
   set textContent(value) { this.savedText = String(value); this.children = []; }
@@ -49,15 +51,23 @@ const upload = {filename: 'sample.pdf', total_pages: 1, pages: [{number: 1, text
   sections: [], references: [], broken_references: [], defined_terms: [], candidate_term_uses: [],
   potentially_undefined_terms: [], validation_warning: null, term_validation_warning: null};
 const calls = [];
+const downloads = [], blobs = [], revoked = [];
+let clipboardText = '', clipboardBlocked = false;
 let demoResponse = {mode: 'mock', message: 'Mock only', findings: [{id: 'D1', category: 'ambiguity',
   title: 'Unclear notice', explanation: 'Potential ambiguity.', status: 'verified', failure_reasons: [],
   evidence: [{quote: 'Notice promptly.', page: 1, verification_status: 'verified', match_count: 1, failure_reason: null}]}]};
 let delayedDemo = null;
 const context = vm.createContext({
-  ReviewDashboard: {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches},
-  document: {getElementById: id => elements.get(id), createElement: tag => {const el = new Element(); el.tagName = tag; return el;},
+  ReviewDashboard: {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, buildCounselLetter, createCounselDraft},
+  document: {body: new Element(), getElementById: id => elements.get(id), createElement: tag => {const el = new Element(); el.tagName = tag; return el;},
     createTextNode: text => ({textContent: text})},
   location: {hostname: '127.0.0.1'}, window: {confirm: () => false},
+  navigator: {clipboard: {writeText: async text => {
+    if (clipboardBlocked) throw new Error('Blocked'); clipboardText = text;
+  }}},
+  Blob, URL: {createObjectURL: blob => {blobs.push(blob); return 'blob:offline-test';},
+    revokeObjectURL: url => revoked.push(url)},
+  setTimeout: callback => callback(),
   AbortController, FormData: class {append() {}},
   fetch: async url => {
     calls.push(url);
@@ -453,6 +463,230 @@ assert.equal(vm.runInContext('editDraft', context), null);
 assert.equal(vm.runInContext('pageElements.size', context), 0);
 assert.equal(elements.get('document-navigation-status').textContent, ''); assert.equal(state().length, 0);
 """, ui=True)
+
+
+    def test_counsel_includes_only_accepted_findings(self):
+        self.run_js(r"""
+const findings = ['accepted', 'pending', 'rejected'].map(decision => ({...candidate(), source: 'real', decision, title: decision + ' topic'}));
+const result = buildCounselLetter(findings, [{number: 1, text: 'Notice promptly.'}]);
+assert.equal(result.count, 1); assert(result.text.includes('accepted topic'));
+assert(!result.text.includes('pending topic')); assert(!result.text.includes('rejected topic'));
+""")
+
+    def test_counsel_uses_latest_saved_edits_and_original_evidence(self):
+        self.run_js(r"""
+const id = add('real'); review.edit(id, 'Human final title', 'Human final explanation'); review.decide(id, 'accepted');
+const result = buildCounselLetter(review.findings(), [{number: 1, text: 'Notice promptly.'}]);
+assert(result.text.includes('Human final title')); assert(result.text.includes('Human final explanation'));
+assert(!result.text.includes('Unclear notice')); assert(result.text.includes('Notice promptly.'));
+assert(result.text.includes('   Human final explanation\n')); assert(result.text.includes('“Notice promptly.” (Page 1)'));
+""")
+
+    def test_counsel_structure_numbering_and_rule_source_references(self):
+        self.run_js(r"""
+const findings = [1, 2].map(page => ({...candidate('not_applicable'), category: 'Potential broken reference',
+  title: 'Section 9.4 was not found', source: 'rules', decision: 'accepted',
+  evidence: [{quote: 'See Section 9.4.', page, verificationStatus: 'not_applicable'}]}));
+const result = buildCounselLetter(findings, []);
+assert.equal(result.count, 2);
+assert(result.text.startsWith('Subject: Questions Regarding Draft Agreement\n\nDear Counsel,'));
+assert(result.text.includes('\n\n1. Section 9.4 was not found')); assert(result.text.includes('\n\n2. Section 9.4 was not found'));
+assert(result.text.includes('Could you please confirm the intended section reference?')); assert(result.text.includes('Thank you for your assistance.'));
+assert(result.text.includes('“See Section 9.4.” (Page 1)')); assert(result.text.includes('“See Section 9.4.” (Page 2)'));
+assert(result.text.includes('See Section 9.4.')); assert(result.text.endsWith('Best regards,\nDocument Review Team'));
+""")
+
+    def test_counsel_no_accepted_findings_returns_no_letter(self):
+        self.run_js(r"""
+assert.deepEqual(buildCounselLetter([], []), {text: '', count: 0, excludedCount: 0});
+assert.equal(buildCounselLetter([{...candidate(), source: 'demo', decision: 'pending'}], []).text, '');
+""")
+
+    def test_counsel_forged_acceptance_cannot_admit_failed_unverified_or_malformed_ai(self):
+        self.run_js(r"""
+for (const status of ['verification_failed', 'unverified', 'not_applicable']) {
+  const f = {...candidate(status), source: 'real', decision: 'accepted'};
+  assert.equal(buildCounselLetter([f], [{number: 1, text: 'Notice promptly.'}]).count, 0);
+}
+for (const mutate of [f => f.evidence = [], f => f.evidence = null,
+    f => f.evidence = [null], f => f.category = 'unsupported', f => f.source = 'unknown',
+    f => f.evidence[0].verificationStatus = 'unverified', f => f.evidence[0].quote = '',
+    f => f.evidence[0].page = '1', f => f.category = 'contradiction',
+    f => f.evidence[0].failureReason = 'Verification failed']) {
+  const f = {...candidate(), source: 'real', decision: 'accepted'}; mutate(f);
+  assert.equal(buildCounselLetter([f], [{number: 1, text: 'Notice promptly.'}]).count, 0);
+}
+assert.equal(buildCounselLetter([null], []).count, 0);
+""")
+
+    def test_counsel_rechecks_ai_quotes_on_original_claimed_page(self):
+        self.run_js(r"""
+const f = {...candidate(), source: 'real', decision: 'accepted'};
+assert.equal(buildCounselLetter([f], [{number: 2, text: 'Notice promptly.'}, {number: 1, text: 'Different text'}]).count, 0);
+assert.equal(buildCounselLetter([f], [{number: 1, text: 'Notice\n  promptly.'}]).count, 1);
+f.evidence[0].quote = 'Invented quote.';
+assert.equal(buildCounselLetter([f], [{number: 1, text: 'Notice promptly.'}]).count, 0);
+""")
+
+    def test_counsel_contradiction_keeps_quotes_without_internal_labels(self):
+        self.run_js(r"""
+const f = {...candidate(), source: 'demo', decision: 'accepted', category: 'contradiction'};
+f.evidence.push({...f.evidence[0], quote: 'Other clause.', page: 2});
+const pages = [{number: 1, text: 'Notice promptly.'}, {number: 2, text: 'Other clause.'}];
+const result = buildCounselLetter([f], pages);
+assert.equal(result.count, 1); assert(result.text.includes('Notice promptly.')); assert(result.text.includes('Other clause.'));
+assert(result.text.includes('Could you please clarify how these provisions are intended to apply together?'));
+for (const label of ['Demo AI', 'synthetic test finding', 'text presence only', 'Reviewer-approved explanation',
+    'Verified supporting quotation', 'Source:', 'quality-control', 'Real Claude AI']) assert(!result.text.includes(label));
+f.evidence[1].verificationStatus = 'verification_failed'; assert.equal(buildCounselLetter([f], pages).count, 0);
+""")
+
+    def test_counsel_draft_keeps_manual_edits_and_requires_explicit_regeneration(self):
+        self.run_js(r"""
+const id = add('real'); review.decide(id, 'accepted'); const draft = createCounselDraft();
+const pages = [{number: 1, text: 'Notice promptly.'}];
+draft.generate(review.findings(), pages); draft.edit('My manual draft');
+draft.check(review.findings()); assert.equal(draft.state().outdated, false);
+review.decide(id, 'rejected'); draft.check(review.findings());
+assert.equal(draft.state().outdated, true); assert.equal(draft.state().text, 'My manual draft');
+assert.equal(draft.generate(review.findings(), pages).count, 0); assert.equal(draft.state().text, 'My manual draft');
+review.decide(id, 'accepted'); draft.check(review.findings()); assert.equal(draft.state().outdated, true);
+draft.generate(review.findings(), pages); assert.equal(draft.state().outdated, false);
+assert(draft.state().text.includes('Unclear notice')); draft.clear(); assert.equal(draft.state().exists, false);
+""")
+
+    def test_actual_ui_no_accepted_findings_shows_message(self):
+        self.run_js(r"""
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+elements.get('draft-counsel-button').listeners.click();
+assert(elements.get('counsel-status').textContent.includes('No accepted, eligible findings'));
+assert.equal(elements.get('counsel-panel').hidden, true);
+assert.equal(elements.get('counsel-letter').value, '');
+""", ui=True)
+
+    def test_actual_ui_copy_and_download_latest_manual_draft_content(self):
+        self.run_js(r"""
+upload.pages[0].text = 'Notice promptly.';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const id = state()[0].id; vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click();
+assert.equal(elements.get('counsel-panel').hidden, false);
+const text = elements.get('counsel-letter'); text.value += '\nManual note for counsel.'; text.listeners.input();
+await elements.get('copy-counsel-button').listeners.click(); assert.equal(clipboardText, text.value);
+elements.get('download-counsel-button').listeners.click();
+assert.equal(downloads[0].filename, 'counsel-questions.txt'); assert.equal(await blobs[0].text(), text.value);
+assert.equal(blobs[0].type, 'text/plain;charset=utf-8'); assert.equal(revoked[0], 'blob:offline-test');
+assert(!calls.includes('/ai-review-real'));
+""", ui=True)
+
+    def test_actual_ui_outdated_draft_preserved_and_exports_blocked_until_regeneration(self):
+        self.run_js(r"""
+upload.pages[0].text = 'Notice promptly.';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const id = state()[0].id; vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click();
+const text = elements.get('counsel-letter'); text.value = 'My manually edited email'; text.listeners.input();
+vm.runInContext(`reviewState.decide('${id}', 'rejected'); renderReviewDashboard()`, context);
+assert.equal(elements.get('counsel-outdated').hidden, false); assert.equal(text.value, 'My manually edited email');
+assert.equal(elements.get('copy-counsel-button').disabled, true); assert.equal(elements.get('download-counsel-button').disabled, true);
+await elements.get('copy-counsel-button').listeners.click(); elements.get('download-counsel-button').listeners.click();
+assert.equal(clipboardText, ''); assert.equal(downloads.length, 0);
+vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+assert.equal(text.value, 'My manually edited email'); elements.get('draft-counsel-button').listeners.click();
+assert.equal(elements.get('counsel-outdated').hidden, true); assert(text.value.includes('Unclear notice'));
+""", ui=True)
+
+    def test_actual_ui_saved_finding_edits_make_letter_outdated(self):
+        self.run_js(r"""
+upload.pages[0].text = 'Notice promptly.';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const id = state()[0].id; vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click(); const before = elements.get('counsel-letter').value;
+const list = elements.get('review-findings'); list.children[0].children.find(c => c.className === 'review-actions').children[3].listeners.click();
+assert.equal(elements.get('draft-counsel-button').disabled, true);
+const editor = list.children[0].children.find(c => c.className === 'finding-editor');
+editor.children[1].value = 'Human final title'; editor.children[1].listeners.input(); editor.children[4].children[0].listeners.click();
+assert.equal(elements.get('counsel-outdated').hidden, false); assert.equal(elements.get('counsel-letter').value, before);
+vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click(); assert(elements.get('counsel-letter').value.includes('Human final title'));
+""", ui=True)
+
+    def test_actual_ui_new_upload_clears_draft_and_manual_edits(self):
+        self.run_js(r"""
+upload.pages[0].text = 'Notice promptly.';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const id = state()[0].id; vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click();
+elements.get('counsel-letter').value = 'Manual text'; elements.get('counsel-letter').listeners.input();
+upload.filename = 'different.pdf'; await uploadFile();
+assert.equal(elements.get('counsel-letter').value, ''); assert.equal(elements.get('counsel-panel').hidden, true);
+assert.equal(elements.get('counsel-outdated').hidden, true); assert.equal(elements.get('counsel-status').textContent, '');
+""", ui=True)
+
+    def test_actual_ui_letter_treats_html_and_source_text_as_plain_text(self):
+        self.run_js(r"""
+const quote = '</textarea><script>alert(1)</script>';
+upload.pages[0].text = quote; demoResponse.findings[0].title = '<img src=x onerror=alert(1)>';
+demoResponse.findings[0].explanation = quote; demoResponse.findings[0].evidence[0].quote = quote;
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const id = state()[0].id; vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click();
+assert(elements.get('counsel-letter').value.includes(quote)); assert(elements.get('counsel-letter').value.includes('<img'));
+assert.equal(elements.get('counsel-letter').children.length, 0);
+assert(!html.includes('innerHTML')); assert(!calls.includes('/ai-review-real'));
+""", ui=True)
+
+    def test_actual_ui_clipboard_failure_has_manual_copy_instructions(self):
+        self.run_js(r"""
+upload.pages[0].text = 'Notice promptly.';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const id = state()[0].id; vm.runInContext(`reviewState.decide('${id}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click(); clipboardBlocked = true;
+await elements.get('copy-counsel-button').listeners.click();
+assert(elements.get('counsel-status').textContent.includes('Command-C')); assert.equal(clipboardText, '');
+""", ui=True)
+
+    def test_actual_ui_newly_accepted_findings_are_not_silently_added(self):
+        self.run_js(r"""
+upload.pages[0].text = 'Notice promptly.';
+demoResponse.findings.push({...demoResponse.findings[0], id: 'D2', title: 'Another topic'});
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const ids = state().map(f => f.id);
+vm.runInContext(`reviewState.decide('${ids[0]}', 'accepted'); renderReviewDashboard()`, context);
+elements.get('draft-counsel-button').listeners.click(); const before = elements.get('counsel-letter').value;
+vm.runInContext(`reviewState.decide('${ids[1]}', 'accepted'); renderReviewDashboard()`, context);
+assert.equal(elements.get('counsel-letter').value, before); assert.equal(elements.get('counsel-outdated').hidden, false);
+elements.get('draft-counsel-button').listeners.click(); assert(elements.get('counsel-letter').value.includes('2. Another topic'));
+""", ui=True)
+
+
+    def test_polished_counsel_template_uses_dynamic_content_without_mutating_findings(self):
+        self.run_js(r"""
+const f = {...candidate(), source: 'real', decision: 'accepted', title: 'Delivery Arrangements',
+  explanation: 'Please clarify the delivery process.', originalTitle: 'Original title', originalExplanation: 'Original explanation',
+  evidence: [{quote: 'Goods arrive at the depot.', page: 7, verificationStatus: 'verified'}]};
+const before = JSON.stringify(f);
+const letter = buildCounselLetter([f], [{number: 7, text: 'Goods arrive at the depot.'}]).text;
+assert(letter.includes('1. Delivery Arrangements\n   Please clarify the delivery process.'));
+assert(letter.includes('“Goods arrive at the depot.” (Page 7)'));
+assert(letter.includes('Could you please clarify the intended meaning or obligation?'));
+assert(!letter.includes('Payment')); assert(!letter.includes('10 days')); assert(!letter.includes('30 days'));
+assert(!letter.includes('Original title')); assert(!letter.includes('Original explanation'));
+assert.equal(JSON.stringify(f), before); // Internal provenance and evidence are untouched.
+""")
+
+    def test_polished_counsel_term_question_keeps_source_and_avoids_technical_labels(self):
+        self.run_js(r"""
+const f = {...candidate('not_applicable'), source: 'rules', decision: 'accepted',
+  category: 'Potentially undefined term', title: 'Delivery Window', explanation: 'Please clarify this term.',
+  evidence: [{quote: 'Delivery Window applies under Section 4.2.', page: 3, verificationStatus: 'not_applicable'}]};
+const letter = buildCounselLetter([f], []).text;
+assert(letter.includes('1. Delivery Window'));
+assert(letter.includes('“Delivery Window applies under Section 4.2.” (Page 3)'));
+assert(letter.includes('Could you please clarify the intended meaning of this term and where it is defined?'));
+assert(!letter.includes('rule-based')); assert(!letter.includes('not independently quote-verified'));
+assert(!letter.includes('Reviewer-approved')); assert(!letter.includes('legally confirmed'));
+""")
 
 
 if __name__ == "__main__":

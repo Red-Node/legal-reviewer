@@ -75,6 +75,67 @@
     }));
   }
 
+  function buildCounselLetter(findings, pages = []) {
+    const accepted = findings.filter(finding => finding && finding.decision === "accepted");
+    const eligible = accepted.filter(finding => {
+      if (typeof finding.title !== "string" || typeof finding.explanation !== "string" ||
+          !finding.title.trim() || !finding.explanation.trim() || !Array.isArray(finding.evidence) ||
+          !finding.evidence.length) return false;
+      const validEvidence = finding.evidence.every(item => item && typeof item.quote === "string" &&
+        item.quote.trim() && Number.isInteger(item.page) && item.page > 0);
+      if (!validEvidence) return false;
+      if (finding.source === "rules") return ["Potential broken reference", "Potentially undefined term"].includes(finding.category) &&
+        finding.verificationStatus === "not_applicable" &&
+        finding.evidence.every(item => item.verificationStatus === "not_applicable");
+      if (!["demo", "real"].includes(finding.source) ||
+          !["contradiction", "ambiguity"].includes(finding.category) || !canAccept(finding)) return false;
+      // Recheck original text, so a manipulated acceptance decision cannot bypass evidence checks.
+      return finding.evidence.every(item => {
+        const page = pages.find(page => page && page.number === item.page);
+        return !item.failureReason && page && typeof page.text === "string" &&
+          findQuoteMatches(page.text, item.quote).length > 0;
+      });
+    });
+    if (!eligible.length) return {text: "", count: 0, excludedCount: accepted.length};
+    // Presentation only: explanations and source evidence remain separate in review state.
+    // Choose neutral questions by category without inferring new contract details.
+    const clarificationQuestions = {
+      contradiction: "Could you please clarify how these provisions are intended to apply together?",
+      ambiguity: "Could you please clarify the intended meaning or obligation?",
+      "Potential broken reference": "Could you please confirm the intended section reference?",
+      "Potentially undefined term": "Could you please clarify the intended meaning of this term and where it is defined?",
+    };
+    const questions = eligible.map((finding, index) => {
+      const evidence = finding.evidence.map(item => `   “${item.quote}” (Page ${item.page})`).join("\n");
+      return `${index + 1}. ${finding.title}\n   ${finding.explanation}\n${evidence}\n` +
+        `   ${clarificationQuestions[finding.category]}`;
+    });
+    return {count: eligible.length, excludedCount: accepted.length - eligible.length, text:
+      "Subject: Questions Regarding Draft Agreement\n\nDear Counsel,\n\n" +
+      "Following our preliminary review of the draft agreement, we would appreciate your clarification on the following points.\n\n" +
+      questions.join("\n\n") + "\n\nThank you for your assistance.\n\nBest regards,\nDocument Review Team"};
+  }
+
+  function createCounselDraft() {
+    let text = "", snapshot = null, outdated = false;
+    return {
+      clear() { text = ""; snapshot = null; outdated = false; },
+      check(findings) {
+        if (snapshot !== null && snapshot !== JSON.stringify(findings)) outdated = true;
+      },
+      generate(findings, pages) {
+        this.check(findings);
+        const result = buildCounselLetter(findings, pages);
+        if (result.count) {
+          text = result.text; snapshot = JSON.stringify(findings); outdated = false;
+        }
+        return result;
+      },
+      edit(value) { text = value; },
+      state: () => ({text, exists: snapshot !== null, outdated}),
+    };
+  }
+
   function createReview() {
     let generation = 0;
     let nextId = 1;
@@ -139,7 +200,7 @@
     };
   }
 
-  const api = {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches};
+  const api = {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, buildCounselLetter, createCounselDraft};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ReviewDashboard = api;
 })(typeof window !== "undefined" ? window : globalThis);

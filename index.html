@@ -24,6 +24,7 @@
     .finding-editor { background: #f3f6fa; padding: 16px; border-radius: 6px; }
     .finding-editor input, .finding-editor textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; margin-bottom: 12px; }
     .finding-editor textarea { min-height: 100px; }
+    #counsel-letter { width: 100%; min-height: 360px; box-sizing: border-box; padding: 12px; font: inherit; line-height: 1.5; }
     .page { scroll-margin-top: 20px; }
     .evidence-target { border: 2px solid #2457b5; }
     mark { background: #ffe08a; color: #172033; }
@@ -69,6 +70,20 @@
         <p id="review-decision-status" role="status" aria-live="polite"></p>
         <p id="review-empty">No review findings yet. Existing rule-based checks are shown below; AI findings appear after an explicit AI review.</p>
         <ul id="review-findings"></ul>
+        <button id="draft-counsel-button" type="button">Draft Questions for Counsel</button>
+        <p id="counsel-status" role="status" aria-live="polite"></p>
+        <section id="counsel-panel" aria-labelledby="counsel-heading" hidden>
+          <h3 id="counsel-heading">Draft Questions for Counsel</h3>
+          <p class="hint">Only accepted, eligible findings are included. This is an editable quality-control draft, not legal advice. Nothing is emailed automatically.</p>
+          <p class="hint">Clicking Draft Questions for Counsel again replaces this draft, including your manual edits. Demo results remain identified in the dashboard. Drafts are lost on reload or a new upload; Download .txt saves a copy only when you click it.</p>
+          <p id="counsel-outdated" class="validation-warning" role="status" hidden>Potentially outdated: review findings have changed. Regenerate before copying or downloading. Your draft edits have been preserved.</p>
+          <label for="counsel-letter">Editable draft email</label>
+          <textarea id="counsel-letter" spellcheck="true"></textarea>
+          <div class="review-actions">
+            <button id="copy-counsel-button" type="button">Copy to Clipboard</button>
+            <button id="download-counsel-button" type="button">Download .txt</button>
+          </div>
+        </section>
       </section>
       <p id="document-navigation-status" role="status" aria-live="polite"></p>
       <div id="pages"></div>
@@ -184,9 +199,89 @@
     let editDraft = null;
     const pageElements = new Map();
     const navigationStatus = document.getElementById("document-navigation-status");
+    const counselDraft = ReviewDashboard.createCounselDraft();
+    const counselPanel = document.getElementById("counsel-panel");
+    const counselText = document.getElementById("counsel-letter");
+    const counselStatus = document.getElementById("counsel-status");
+    const counselOutdated = document.getElementById("counsel-outdated");
+    const draftCounselButton = document.getElementById("draft-counsel-button");
+    const copyCounselButton = document.getElementById("copy-counsel-button");
+    const downloadCounselButton = document.getElementById("download-counsel-button");
+
+    function updateCounselStatus() {
+      counselDraft.check(reviewState.findings());
+      const draft = counselDraft.state();
+      counselPanel.hidden = !draft.exists;
+      counselOutdated.hidden = !draft.outdated;
+      copyCounselButton.disabled = downloadCounselButton.disabled = !draft.exists || draft.outdated || !draft.text.trim();
+      draftCounselButton.disabled = editDraft !== null;
+    }
+
+    draftCounselButton.addEventListener("click", () => {
+      if (editDraft) {
+        counselStatus.textContent = "Save or cancel the finding edit before drafting.";
+        return;
+      }
+      const result = counselDraft.generate(reviewState.findings(), currentPages || []);
+      if (!result.count) {
+        counselStatus.textContent = "No accepted, eligible findings to include. Accept a finding with eligible evidence first. Any existing draft has been retained.";
+      } else {
+        // Only an explicit generation action replaces the reviewer's draft edits.
+        counselText.value = result.text;
+        counselStatus.textContent = `Draft generated from ${result.count} accepted ${result.count === 1 ? "finding" : "findings"}.` +
+          (result.excludedCount ? ` ${result.excludedCount} accepted findings were excluded because their evidence is not eligible.` : "");
+      }
+      updateCounselStatus();
+    });
+
+    counselText.addEventListener("input", () => {
+      counselDraft.edit(counselText.value);
+      updateCounselStatus();
+    });
+
+    function currentCounselText() {
+      updateCounselStatus();
+      const draft = counselDraft.state();
+      if (!draft.exists || draft.outdated || !draft.text.trim()) {
+        counselStatus.textContent = "Generate a current, nonempty draft before copying or downloading.";
+        return null;
+      }
+      return draft.text;
+    }
+
+    copyCounselButton.addEventListener("click", async () => {
+      const text = currentCounselText();
+      if (text === null) return;
+      const token = reviewState.token();
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error("Clipboard unavailable");
+        await navigator.clipboard.writeText(text);
+        if (token === reviewState.token()) counselStatus.textContent = "Draft copied to clipboard. Nothing was sent.";
+      } catch {
+        if (token === reviewState.token()) counselStatus.textContent = "Clipboard access unavailable. Select the draft text and copy it manually with Command-C (or Control-C).";
+      }
+    });
+
+    downloadCounselButton.addEventListener("click", () => {
+      const text = currentCounselText();
+      if (text === null) return;
+      const url = URL.createObjectURL(new Blob([text], {type: "text/plain;charset=utf-8"}));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "counsel-questions.txt";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      // Allow the browser to start reading the Blob before releasing its URL.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      counselStatus.textContent = "Text download requested. Nothing was emailed.";
+    });
 
     function resetDemo() {
       reviewState.reset();
+      counselDraft.clear();
+      counselText.value = "";
+      counselStatus.textContent = "";
       editDraft = null;
       clearHighlights();
       pageElements.clear();
@@ -311,6 +406,7 @@
 
     function renderReviewDashboard() {
       if (editDraft && !reviewState.findings().some(finding => finding.id === editDraft.id)) editDraft = null;
+      updateCounselStatus();
       reviewList.replaceChildren();
       const counts = reviewState.counts();
       reviewCounts.textContent = `Total findings: ${counts.total} · To review: ${counts.pending} · Accepted: ${counts.accepted} · Rejected: ${counts.rejected}`;
