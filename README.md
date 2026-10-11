@@ -12,9 +12,12 @@ then flags potential issues when a complete term's definition was not found.
 - `main.py`: serves the webpage and handles PDF uploads and text extraction.
 - `detection.py`: identifies headings and references, then compares exact section numbers.
 - `terms.py`: detects definitions and candidate uses, then checks for potential missing definitions.
+- `ai_reviewer.py`: reads Claude configuration and prepares an inactive future API function.
+- `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
 - `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
+- `test_ai_reviewer.py`: tests configuration and future Claude requests with a mocked client.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -177,6 +180,61 @@ python -m unittest -v
 ```
 
 The tests create sample PDF data in memory; no test documents are stored.
+Claude tests use fake credentials and a mocked SDK client, ignore your local
+`.env`, and block network connections. The tests run offline with no paid requests.
+
+## Claude preparation (Milestone 4A)
+
+The [official Anthropic Python SDK](https://github.com/anthropics/anthropic-sdk-python)
+and `python-dotenv` are included in `requirements.txt`. If you already have the
+app installed, update its packages from the project folder:
+
+```sh
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+An API key is **optional for this milestone**. The PDF app and all tests work
+without one. No Claude calls are connected to the webpage or PDF uploads.
+
+To prepare local configuration:
+
+1. If you do not already have a `.env` file, run `cp .env.example .env` in the
+   project folder. Skip this command if `.env` already exists so you keep its settings.
+2. Open `.env` in your local text editor. Replace `your_key_here` with your own
+   Anthropic API key. Keep the key private; do not paste it into chat, screenshots,
+   source code, or the README.
+3. Leave the model setting as `ANTHROPIC_MODEL=claude-sonnet-5-5`, or change it
+   later if you choose a different model.
+
+The example file contains:
+
+```dotenv
+ANTHROPIC_API_KEY=your_key_here
+ANTHROPIC_MODEL=claude-sonnet-5-5
+```
+
+`.env` is excluded by `.gitignore`; `.env.example` contains only a placeholder.
+Existing environment variables take priority over `.env` settings. A missing or
+blank model setting defaults to `claude-sonnet-5-5`. Missing, blank, and placeholder
+keys are treated as unconfigured.
+
+Check configuration safely with:
+
+```sh
+python -c "from ai_reviewer import get_configuration_status; print(get_configuration_status())"
+```
+
+This prints only `api_key_configured` (True or False) and the model name. It never
+prints the key or contacts Anthropic. True means a key value is present; it does
+not verify the key, account balance, or model availability. Those are not tested
+in this milestone.
+
+`send_text_to_claude()` is a small function prepared for a future milestone.
+**Do not call it with a real key yet:** doing so would send its supplied text to
+Anthropic and could incur charges. Only mocked tests exercise it here. There is
+no contradiction detection or other AI analysis, and the browser results stay
+the same. You can upload a PDF as before to check the existing features.
 
 ## Limits and document handling
 
@@ -217,4 +275,6 @@ The tests create sample PDF data in memory; no test documents are stored.
   page breaks can affect detection. Excerpts keep
   original words and punctuation while joining whitespace and truncating long context.
 
-There is no AI, legal analysis, editing, database, or external API integration.
+Claude integration is prepared but inactive. The application uses deterministic
+rules and sends no uploaded documents to external APIs. There is no AI analysis,
+document editing, or database storage.
