@@ -36,10 +36,43 @@
   }
 
   function canAccept(finding) {
+    if (finding.verificationStatus === "verification_failed" ||
+        finding.evidence.some(item => item.verificationStatus === "verification_failed")) return false;
     if (finding.source === "rules") return true;
     const minimum = finding.category === "contradiction" ? 2 : 1;
     return finding.verificationStatus === "verified" && finding.evidence.length >= minimum &&
       finding.evidence.every(item => item.verificationStatus === "verified");
+  }
+
+  // Collapse only whitespace, keeping an offset back to every original character.
+  // This is the same whitespace and whole-word matching used by quote_verifier.py.
+  function findQuoteMatches(text, quote) {
+    const whitespace = /[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/u;
+    function normalize(value) {
+      let normalized = "";
+      const starts = [], ends = [];
+      for (let i = 0; i < value.length;) {
+        const start = i;
+        if (whitespace.test(value[i])) {
+          while (i < value.length && whitespace.test(value[i])) i++;
+          if (!normalized || i === value.length) continue;
+          normalized += " "; starts.push(start); ends.push(i);
+        } else {
+          normalized += value[i]; starts.push(i); ends.push(++i);
+        }
+      }
+      return {normalized, starts, ends};
+    }
+    const source = normalize(text), target = normalize(quote).normalized;
+    if (!target) return [];
+    const word = /[\p{L}\p{N}_]/u;
+    const letters = [...target];
+    const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = (word.test(letters[0]) ? "(?<![\\p{L}\\p{N}_])" : "") + escaped +
+      (word.test(letters[letters.length - 1]) ? "(?![\\p{L}\\p{N}_])" : "");
+    return [...source.normalized.matchAll(new RegExp(`(?=${pattern})`, "gu"))].map(match => ({
+      start: source.starts[match.index], end: source.ends[match.index + target.length - 1],
+    }));
   }
 
   function createReview() {
@@ -48,7 +81,8 @@
     let findings = [];
     const copy = value => JSON.parse(JSON.stringify(value));
     const key = finding => JSON.stringify([
-      finding.category, finding.title, finding.explanation, finding.verificationStatus, finding.evidence,
+      finding.category, finding.originalTitle ?? finding.title,
+      finding.originalExplanation ?? finding.explanation, finding.verificationStatus, finding.evidence,
     ]);
 
     return {
@@ -70,7 +104,8 @@
         const updated = candidates.map(candidate => {
           const same = previous.get(key(candidate));
           if (same && same.length) return same.shift();
-          return {...copy(candidate), source, id: `review-${generation}-${nextId++}`, decision: "pending"};
+          return {...copy(candidate), originalTitle: candidate.title, originalExplanation: candidate.explanation,
+            source, id: `review-${generation}-${nextId++}`, decision: "pending"};
         });
         findings = [...findings.filter(item => item.source !== source), ...updated];
         return true;
@@ -80,6 +115,16 @@
         const finding = findings.find(item => item.id === id);
         if (!finding || (decision === "accepted" && !canAccept(finding))) return false;
         finding.decision = decision;
+        return true;
+      },
+      edit(id, title, explanation) {
+        const finding = findings.find(item => item.id === id);
+        if (!finding || typeof title !== "string" || typeof explanation !== "string" ||
+            !title.trim() || !explanation.trim()) return false;
+        // Only wording can change. IDs, source evidence, and verification stay intact.
+        finding.title = title.trim();
+        finding.explanation = explanation.trim();
+        if (finding.decision === "accepted") finding.decision = "pending";
         return true;
       },
       findings: () => copy(findings),
@@ -94,7 +139,7 @@
     };
   }
 
-  const api = {createReview, ruleFindings, aiFindings, canAccept};
+  const api = {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ReviewDashboard = api;
 })(typeof window !== "undefined" ? window : globalThis);

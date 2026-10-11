@@ -20,6 +20,14 @@
     .review-actions button:disabled { cursor: not-allowed; }
     .review-actions .reject-button { background: #922020; }
     .review-actions .pending-button { background: #526078; }
+    #review-findings > li { padding: 16px 0; border-bottom: 1px solid #d6dde7; }
+    .finding-editor { background: #f3f6fa; padding: 16px; border-radius: 6px; }
+    .finding-editor input, .finding-editor textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; margin-bottom: 12px; }
+    .finding-editor textarea { min-height: 100px; }
+    .page { scroll-margin-top: 20px; }
+    .evidence-target { border: 2px solid #2457b5; }
+    mark { background: #ffe08a; color: #172033; }
+    textarea:focus-visible { outline: 3px solid #7da9f8; outline-offset: 4px; }
     button:focus-visible, input:focus-visible { outline: 3px solid #7da9f8; outline-offset: 4px; }
     #error, #ai-error, #real-error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
     .verified { color: #185b35; background: #e7f5ec; }
@@ -56,12 +64,13 @@
       <section class="detections" aria-labelledby="review-heading">
         <h2 id="review-heading">Review Findings</h2>
         <p class="hint">Accept or reject each potential issue explicitly. Evidence verification and human decisions are separate. Verified text does not confirm a legal interpretation.</p>
-        <p class="validation-warning">Decisions are kept only in browser memory and are lost after a page reload or a new upload. Demo findings are synthetic test results.</p>
+        <p class="validation-warning">Decisions and edits are kept only in browser memory and are lost after a page reload or a new upload. Saving edits to an accepted finding returns it to pending. Demo findings are synthetic test results.</p>
         <p id="review-counts" role="status" aria-live="polite"></p>
         <p id="review-decision-status" role="status" aria-live="polite"></p>
         <p id="review-empty">No review findings yet. Existing rule-based checks are shown below; AI findings appear after an explicit AI review.</p>
         <ul id="review-findings"></ul>
       </section>
+      <p id="document-navigation-status" role="status" aria-live="polite"></p>
       <div id="pages"></div>
       <h2>Rule-based Checks</h2>
       <section class="detections" aria-labelledby="sections-heading">
@@ -172,9 +181,16 @@
     let currentPages = null;
     let demoController = null;
     let realController = null;
+    let editDraft = null;
+    const pageElements = new Map();
+    const navigationStatus = document.getElementById("document-navigation-status");
 
     function resetDemo() {
       reviewState.reset();
+      editDraft = null;
+      clearHighlights();
+      pageElements.clear();
+      navigationStatus.textContent = "";
       reviewDecisionStatus.textContent = "";
       renderReviewDashboard();
       currentPages = null;
@@ -214,7 +230,87 @@
       return element;
     }
 
+    function clearHighlights() {
+      for (const page of pageElements.values()) {
+        page.text.textContent = page.sourceText.trim() ? page.sourceText : "No extractable text on this page.";
+        page.section.classList.remove("evidence-target");
+        page.location.textContent = "";
+      }
+    }
+
+    function viewEvidence(evidence) {
+      clearHighlights();
+      const page = pageElements.get(evidence.page);
+      const matches = page ? ReviewDashboard.findQuoteMatches(page.sourceText, evidence.quote) : [];
+      if (!matches.length) {
+        navigationStatus.textContent = `Cannot locate this exact evidence on Page ${evidence.page}. No text was highlighted.`;
+        reviewDecisionStatus.textContent = navigationStatus.textContent;
+        return;
+      }
+      // Merge overlapping occurrences for rendering; retain the true occurrence count.
+      const ranges = [];
+      for (const match of matches) {
+        const previous = ranges[ranges.length - 1];
+        if (previous && match.start < previous.end) previous.end = Math.max(previous.end, match.end);
+        else ranges.push({...match});
+      }
+      page.text.replaceChildren();
+      let offset = 0;
+      for (const match of ranges) {
+        page.text.append(document.createTextNode(page.sourceText.slice(offset, match.start)));
+        const highlight = document.createElement("mark");
+        highlight.textContent = page.sourceText.slice(match.start, match.end);
+        page.text.append(highlight);
+        offset = match.end;
+      }
+      page.text.append(document.createTextNode(page.sourceText.slice(offset)));
+      const message = `Page ${evidence.page}: ${matches.length} ${matches.length === 1 ? "match highlighted" : "matches highlighted; this quote does not identify a unique location"}. Evidence text only; legal interpretation is not verified.`;
+      navigationStatus.textContent = message;
+      page.location.textContent = message;
+      reviewDecisionStatus.textContent = message;
+      page.section.classList.add("evidence-target");
+      page.section.scrollIntoView({behavior: "smooth", block: "start"});
+      page.heading.focus({preventScroll: true});
+    }
+
+    function renderEditor(finding, item) {
+      const editor = document.createElement("div");
+      editor.className = "finding-editor";
+      for (const [field, labelText, tag] of [["title", "Finding title", "input"], ["explanation", "Finding explanation", "textarea"]]) {
+        const label = document.createElement("label");
+        const input = document.createElement(tag);
+        input.id = `edit-${field}-${finding.id}`;
+        label.htmlFor = input.id;
+        label.textContent = labelText;
+        input.value = editDraft[field];
+        input.addEventListener("input", () => { editDraft[field] = input.value; });
+        editor.append(label, input);
+      }
+      const actions = document.createElement("div");
+      actions.className = "review-actions";
+      for (const label of ["Save", "Cancel"]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.setAttribute("aria-label", `${label} edits for finding ${finding.id}`);
+        button.addEventListener("click", () => {
+          if (label === "Save" && !reviewState.edit(finding.id, editDraft.title, editDraft.explanation)) {
+            reviewDecisionStatus.textContent = "Enter both a title and an explanation before saving.";
+            return;
+          }
+          editDraft = null;
+          renderReviewDashboard();
+          reviewDecisionStatus.textContent = label === "Save" ?
+            `Finding ${finding.id}: wording saved. Previously accepted findings return to pending.` : "Edits cancelled; saved wording and decision unchanged.";
+        });
+        actions.append(button);
+      }
+      editor.append(actions);
+      item.append(editor);
+    }
+
     function renderReviewDashboard() {
+      if (editDraft && !reviewState.findings().some(finding => finding.id === editDraft.id)) editDraft = null;
       reviewList.replaceChildren();
       const counts = reviewState.counts();
       reviewCounts.textContent = `Total findings: ${counts.total} · To review: ${counts.pending} · Accepted: ${counts.accepted} · Rejected: ${counts.rejected}`;
@@ -226,10 +322,25 @@
         heading.textContent = `${finding.category} — ${finding.title}`;
         item.append(heading, paragraph(`ID: ${finding.id} · Source: ${sourceLabels[finding.source]}`),
           paragraph(finding.explanation));
+        if (finding.title !== finding.originalTitle || finding.explanation !== finding.originalExplanation) {
+          item.append(paragraph("Human-edited wording", "hint"));
+          const original = document.createElement("details");
+          const label = document.createElement("summary");
+          label.textContent = finding.source === "rules" ? "Original rule-based wording" : "Original AI-generated wording";
+          original.append(label, paragraph(finding.originalTitle), paragraph(finding.originalExplanation));
+          item.append(original);
+        }
         const evidenceList = document.createElement("ul");
         for (const evidence of finding.evidence) {
           const quote = document.createElement("li");
           quote.append(paragraph(`Page ${evidence.page} — “${evidence.quote}”`));
+          if (evidence.quote.trim()) {
+            const view = document.createElement("button");
+            view.type = "button";
+            view.textContent = "View in document";
+            view.addEventListener("click", () => viewEvidence(evidence));
+            quote.append(view);
+          }
           if (finding.source !== "rules") {
             quote.append(paragraph(`Quote verification: ${evidence.verificationStatus}`,
               `verification-status ${evidence.verificationStatus === "verified" ? "verified" : "verification_failed"}`));
@@ -258,6 +369,21 @@
           actions.append(action);
         }
         item.append(actions);
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.textContent = "Edit";
+        edit.setAttribute("aria-label", `Edit finding ${finding.id}`);
+        edit.disabled = editDraft !== null;
+        edit.addEventListener("click", () => {
+          editDraft = {id: finding.id, title: finding.title, explanation: finding.explanation};
+          renderReviewDashboard();
+        });
+        actions.append(edit);
+        if (editDraft && editDraft.id === finding.id) {
+          // Approve the saved wording, never an unfinished draft.
+          for (const action of actions.children) action.disabled = true;
+          renderEditor(finding, item);
+        }
         if (!ReviewDashboard.canAccept(finding)) item.append(paragraph(
           "Accept is unavailable because supporting evidence did not pass verification. You may reject this finding or leave it pending.", "validation-warning"));
         reviewList.append(item);
@@ -466,10 +592,13 @@
           section.className = "page";
           const heading = document.createElement("h2");
           heading.textContent = `Page ${page.number}`;
+          heading.tabIndex = -1;
           const text = document.createElement("pre");
           // Use textContent so document text is always displayed as plain text.
           text.textContent = page.text.trim() ? page.text : "No extractable text on this page.";
-          section.append(heading, text);
+          const location = paragraph("", "hint");
+          section.append(heading, location, text);
+          pageElements.set(page.number, {section, heading, text, location, sourceText: page.text});
           pages.append(section);
         }
         for (const section of data.sections) {

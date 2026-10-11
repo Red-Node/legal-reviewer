@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 NODE = shutil.which("node")
 JS_SETUP = """
 const assert = require('node:assert/strict');
-const {createReview, ruleFindings, aiFindings, canAccept} = require(REVIEW_PATH);
+const {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches} = require(REVIEW_PATH);
 const review = createReview();
 review.reset();
 const candidate = (status = 'verified') => ({
@@ -33,9 +33,14 @@ const vm = require('node:vm');
 const html = fs.readFileSync(INDEX_PATH, 'utf8');
 class Element {
   constructor() { this.children = []; this.textContent = ''; this.hidden = false;
-    this.disabled = false; this.listeners = {}; this.files = []; }
+    this.disabled = false; this.listeners = {}; this.files = []; this.value = '';
+    this.classList = {add: name => {this.highlightClass = name;}, remove: () => {this.highlightClass = null;}}; }
+  focus() { this.focused = true; }
+  scrollIntoView() { this.scrolled = true; }
+  set textContent(value) { this.savedText = String(value); this.children = []; }
+  get textContent() { return this.children.length ? this.children.map(c => c.textContent).join('') : this.savedText; }
   append(...items) { this.children.push(...items); }
-  replaceChildren(...items) { this.children = items; }
+  replaceChildren(...items) { this.savedText = ''; this.children = items; }
   setAttribute() {}
   addEventListener(event, handler) { this.listeners[event] = handler; }
 }
@@ -49,8 +54,9 @@ let demoResponse = {mode: 'mock', message: 'Mock only', findings: [{id: 'D1', ca
   evidence: [{quote: 'Notice promptly.', page: 1, verification_status: 'verified', match_count: 1, failure_reason: null}]}]};
 let delayedDemo = null;
 const context = vm.createContext({
-  ReviewDashboard: {createReview, ruleFindings, aiFindings, canAccept},
-  document: {getElementById: id => elements.get(id), createElement: () => new Element()},
+  ReviewDashboard: {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches},
+  document: {getElementById: id => elements.get(id), createElement: tag => {const el = new Element(); el.tagName = tag; return el;},
+    createTextNode: text => ({textContent: text})},
   location: {hostname: '127.0.0.1'}, window: {confirm: () => false},
   AbortController, FormData: class {append() {}},
   fetch: async url => {
@@ -252,6 +258,200 @@ const actions = item.children.find(child => child.className === 'review-actions'
 assert.equal(actions.children[0].disabled, true);
 actions.children[0].listeners.click(); assert.equal(state()[0].decision, 'pending');
 actions.children[1].listeners.click(); assert.equal(state()[0].decision, 'rejected');
+""", ui=True)
+
+
+    def test_save_edits_preserves_original_wording_and_immutable_evidence(self):
+        self.run_js("""
+const id = add(); const before = review.findings()[0];
+assert.equal(review.edit(id, 'Edited title', 'Human explanation'), true);
+const after = review.findings()[0];
+assert.equal(after.title, 'Edited title'); assert.equal(after.explanation, 'Human explanation');
+assert.equal(after.originalTitle, before.title); assert.equal(after.originalExplanation, before.explanation);
+for (const field of ['id', 'source', 'category', 'evidence', 'verificationStatus']) assert.deepEqual(after[field], before[field]);
+review.edit(id, 'Second edit', 'Second explanation');
+assert.equal(review.findings()[0].originalTitle, before.title);
+""")
+
+    def test_editing_accepted_finding_resets_pending_and_counters(self):
+        self.run_js("""
+const id = add(); review.decide(id, 'accepted'); review.edit(id, 'Final wording', 'Explanation');
+assert.equal(review.findings()[0].decision, 'pending');
+assert.deepEqual(review.counts(), {total: 1, pending: 1, accepted: 0, rejected: 0});
+assert.equal(review.decide(id, 'accepted'), true);
+""")
+
+    def test_editing_failed_finding_cannot_enable_acceptance(self):
+        self.run_js("""
+const id = add('demo', 'verification_failed'); review.edit(id, 'Edited', 'Changed');
+assert.equal(review.decide(id, 'accepted'), false);
+assert.equal(review.findings()[0].verificationStatus, 'verification_failed');
+""")
+
+    def test_invalid_edits_and_old_ids_do_not_change_saved_state(self):
+        self.run_js("""
+const id = add(); const before = review.findings();
+assert.equal(review.edit(id, ' ', 'Explanation'), false);
+assert.equal(review.edit(id, 'Title', ''), false);
+assert.equal(review.edit(id, {evidence: []}, 'Explanation'), false);
+assert.deepEqual(review.findings(), before);
+review.reset(); assert.equal(review.edit(id, 'Title', 'Explanation'), false);
+""")
+
+    def test_unchanged_ai_rerun_preserves_human_edits_and_id(self):
+        self.run_js("""
+const id = add(); review.edit(id, 'Human title', 'Human explanation'); review.decide(id, 'accepted'); add();
+assert.equal(review.findings()[0].id, id); assert.equal(review.findings()[0].title, 'Human title');
+assert.equal(review.findings()[0].decision, 'accepted');
+""")
+
+    def test_highlight_exact_quote_offsets(self):
+        self.run_js("""
+const source = 'Before. Notice promptly. After.';
+const matches = findQuoteMatches(source, 'Notice promptly.');
+assert.deepEqual(matches, [{start: 8, end: 24}]);
+assert.equal(source.slice(matches[0].start, matches[0].end), 'Notice promptly.');
+""")
+
+    def test_highlight_pdf_whitespace_preserves_original_characters(self):
+        self.run_js(r"""
+const source = 'Before Notice\n  promptly. After';
+const matches = findQuoteMatches(source, ' Notice\t promptly. ');
+assert.equal(matches.length, 1);
+assert.equal(source.slice(matches[0].start, matches[0].end), 'Notice\n  promptly.');
+assert.equal(findQuoteMatches('Notice\u0085promptly.', 'Notice promptly.').length, 1);
+assert.equal(findQuoteMatches('The fee is $10.50 (fixed).', '$10.50 (fixed).').length, 1);
+""")
+
+    def test_highlight_missing_empty_and_changed_quotes(self):
+        self.run_js("""
+for (const quote of ['', '  ', 'Invented quote', 'notice promptly.', 'Notice promptly!', 'Notice immediately.']) {
+  assert.deepEqual(findQuoteMatches('Notice promptly.', quote), []);
+}
+assert.deepEqual(findQuoteMatches('Business Daylight', 'Business Day'), []);
+assert.deepEqual(findQuoteMatches('Payment 100', 'Payment 10'), []);
+""")
+
+    def test_highlight_repeated_and_overlapping_matches(self):
+        self.run_js("""
+assert.equal(findQuoteMatches('Notice promptly. Notice promptly.', 'Notice promptly.').length, 2);
+assert.deepEqual(findQuoteMatches('a a a', 'a a'), [{start: 0, end: 3}, {start: 2, end: 5}]);
+""")
+
+    def test_actual_ui_save_plain_text_and_reapprove_final_wording(self):
+        self.run_js("""
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const list = elements.get('review-findings');
+const actions = () => list.children[0].children.find(c => c.className === 'review-actions');
+actions().children[0].listeners.click(); actions().children[3].listeners.click();
+const editor = list.children[0].children.find(c => c.className === 'finding-editor');
+editor.children[1].value = '<img src=x onerror=alert(1)>'; editor.children[1].listeners.input();
+editor.children[3].value = 'Human explanation'; editor.children[3].listeners.input();
+editor.children[4].children[0].listeners.click();
+assert.equal(state()[0].title, '<img src=x onerror=alert(1)>');
+assert.equal(list.children[0].children[0].textContent, 'ambiguity — <img src=x onerror=alert(1)>');
+assert.equal(state()[0].originalTitle, 'Unclear notice'); assert.equal(state()[0].decision, 'pending');
+assert(list.children[0].children.some(c => c.tagName === 'details'));
+assert(elements.get('review-counts').textContent.includes('Accepted: 0'));
+actions().children[0].listeners.click(); assert.equal(state()[0].decision, 'accepted');
+assert(!calls.includes('/ai-review-real'));
+""", ui=True)
+
+    def test_actual_ui_cancel_discards_draft_and_keeps_acceptance(self):
+        self.run_js("""
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const list = elements.get('review-findings');
+let actions = list.children[0].children.find(c => c.className === 'review-actions');
+actions.children[0].listeners.click(); actions = list.children[0].children.find(c => c.className === 'review-actions');
+actions.children[3].listeners.click();
+const editor = list.children[0].children.find(c => c.className === 'finding-editor');
+editor.children[1].value = 'Discard me'; editor.children[1].listeners.input();
+editor.children[4].children[1].listeners.click();
+assert.equal(state()[0].title, 'Unclear notice'); assert.equal(state()[0].decision, 'accepted');
+assert(!list.children[0].children.some(c => c.className === 'finding-editor'));
+""", ui=True)
+
+    def test_actual_ui_edited_failed_evidence_stays_blocked(self):
+        self.run_js("""
+demoResponse.findings[0].status = 'verification_failed';
+demoResponse.findings[0].evidence[0].verification_status = 'verification_failed';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const list = elements.get('review-findings');
+list.children[0].children.find(c => c.className === 'review-actions').children[3].listeners.click();
+const editor = list.children[0].children.find(c => c.className === 'finding-editor');
+editor.children[1].value = 'Edited'; editor.children[1].listeners.input(); editor.children[4].children[0].listeners.click();
+const accept = list.children[0].children.find(c => c.className === 'review-actions').children[0];
+assert.equal(accept.disabled, true); accept.listeners.click(); assert.equal(state()[0].decision, 'pending');
+assert.equal(state()[0].evidence[0].quote, 'Notice promptly.');
+""", ui=True)
+
+    def test_actual_ui_navigates_only_claimed_page_and_highlights_source(self):
+        self.run_js(r"""
+upload.pages = [{number: 1, text: 'Notice promptly.'}, {number: 2, text: 'Before Notice\n promptly. After'}];
+demoResponse.findings[0].evidence[0].page = 2;
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+vm.runInContext('viewEvidence(reviewState.findings()[0].evidence[0])', context);
+const page = vm.runInContext('pageElements.get(2)', context);
+assert.equal(page.section.scrolled, true); assert.equal(page.heading.focused, true);
+assert.equal(vm.runInContext('pageElements.get(1).section.scrolled', context), undefined);
+assert.equal(page.text.children.find(c => c.tagName === 'mark').textContent, 'Notice\n promptly.');
+assert.equal(page.text.children.map(c => c.textContent).join(''), upload.pages[1].text);
+assert(elements.get('document-navigation-status').textContent.includes('Page 2: 1 match'));
+""", ui=True)
+
+    def test_actual_ui_wrong_page_and_missing_quote_do_not_scroll(self):
+        self.run_js("""
+upload.pages = [{number: 1, text: 'Nothing here'}, {number: 2, text: 'Notice promptly.'}];
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+vm.runInContext('viewEvidence(reviewState.findings()[0].evidence[0])', context);
+assert(elements.get('document-navigation-status').textContent.includes('Cannot locate'));
+assert.equal(vm.runInContext('pageElements.get(2).section.scrolled', context), undefined);
+vm.runInContext('viewEvidence({quote: "Notice promptly.", page: 99})', context);
+assert(elements.get('document-navigation-status').textContent.includes('Page 99'));
+""", ui=True)
+
+    def test_actual_ui_repeated_quotes_show_all_locations_and_safe_text(self):
+        self.run_js("""
+upload.pages[0].text = '<script> Notice promptly. Notice promptly. </script>';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const item = elements.get('review-findings').children[0];
+const evidenceList = item.children.find(c => c.tagName === 'ul');
+evidenceList.children[0].children.find(c => c.tagName === 'button').listeners.click();
+const page = vm.runInContext('pageElements.get(1)', context);
+assert.equal(page.text.children.filter(c => c.tagName === 'mark').length, 2);
+assert.equal(page.text.children.map(c => c.textContent).join(''), upload.pages[0].text);
+assert(elements.get('document-navigation-status').textContent.includes('does not identify a unique location'));
+assert(!page.text.children.some(c => c.tagName === 'script'));
+""", ui=True)
+
+    def test_actual_ui_multiple_evidence_actions_replace_old_highlights(self):
+        self.run_js("""
+upload.pages[0].text = 'Notice promptly. Payment within 30 days.';
+demoResponse.findings[0].category = 'contradiction';
+demoResponse.findings[0].evidence.push({...demoResponse.findings[0].evidence[0], quote: 'Payment within 30 days.'});
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+const evidenceList = elements.get('review-findings').children[0].children.find(c => c.tagName === 'ul');
+assert.equal(evidenceList.children.length, 2);
+for (const item of evidenceList.children) item.children.find(c => c.tagName === 'button').listeners.click();
+const page = vm.runInContext('pageElements.get(1)', context);
+assert.equal(page.text.children.filter(c => c.tagName === 'mark').length, 1);
+assert.equal(page.text.children.find(c => c.tagName === 'mark').textContent, 'Payment within 30 days.');
+vm.runInContext('viewEvidence({quote: "Invented text", page: 1})', context);
+assert.equal(page.text.children.filter(c => c.tagName === 'mark').length, 0);
+assert.equal(page.text.textContent, upload.pages[0].text);
+""", ui=True)
+
+    def test_actual_ui_upload_clears_edits_drafts_and_highlights(self):
+        self.run_js("""
+upload.pages[0].text = 'Notice promptly.';
+await uploadFile(); await elements.get('ai-demo-button').listeners.click();
+vm.runInContext('viewEvidence(reviewState.findings()[0].evidence[0])', context);
+const list = elements.get('review-findings');
+list.children[0].children.find(c => c.className === 'review-actions').children[3].listeners.click();
+elements.get('pdf-file').listeners.change();
+assert.equal(vm.runInContext('editDraft', context), null);
+assert.equal(vm.runInContext('pageElements.size', context), 0);
+assert.equal(elements.get('document-navigation-status').textContent, ''); assert.equal(state().length, 0);
 """, ui=True)
 
 

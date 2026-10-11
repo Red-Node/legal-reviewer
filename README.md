@@ -18,7 +18,7 @@ human Accept / Reject decisions, kept in memory for the current review only.
 - `quote_verifier.py`: independently checks evidence quotes against their claimed original pages, entirely offline.
 - `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
-- `review.js`: manages unified finding IDs, human decisions, evidence acceptance checks, and counters in browser memory.
+- `review.js`: manages unified finding IDs, human decisions, wording edits, evidence acceptance checks, counters, and exact quote matching in browser memory.
 - `test_review.py`: runs offline JavaScript state and UI event-handler tests using Node.js.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
 - `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
@@ -480,8 +480,8 @@ errors, and independent requests. Demo JSON requests have a 10 MB size limit.
 
 Limitations: the mock results are fixed, so this does not test Claude's reasoning
 or analyze arbitrary contracts. Verification still confirms quote presence only,
-with the whitespace and extraction limitations described above. No Edit workflow
-is implemented. Milestone 5A below adds Accept / Reject decisions.
+with the whitespace and extraction limitations described above. Milestones 5A
+and 5B below add human decisions, wording edits, and evidence highlighting.
 
 ## Real Claude preparation, disabled by default (Milestone 4D-2A)
 
@@ -567,8 +567,8 @@ still apply. The timeout is an SDK timeout, not a guarantee of a strict overall
 wall-clock deadline. There is no persistent document storage, but a future
 approved real request will disclose text to Anthropic. Real model behavior, model
 availability, and costs have not been tested here. Quote presence does not establish
-legal correctness. Milestone 5A below adds Accept / Reject decisions; no Edit
-workflow is implemented.
+legal correctness. Milestones 5A and 5B below add human decisions, wording edits,
+and evidence highlighting.
 
 ## Human review dashboard (Milestone 5A)
 
@@ -648,10 +648,101 @@ synthetic data, a small DOM stand-in, and mocked fetch responses. No server or
 external network is needed for these tests; existing Anthropic tests remain mocked.
 
 Limitations: decisions have no permanent storage or audit history, and independent
-tabs do not share them. There is no counsel letter, export, Edit control, or email
-sending. Accepted demo findings are still synthetic test results. Findings from
+tabs do not share them. There is no counsel letter, export, or email sending. Milestone 5B below adds
+wording edits and evidence highlighting. Accepted demo findings are still synthetic test results. Findings from
 different sources are kept separate, so related rule and AI issues may appear
 more than once. IDs and decisions are not suitable for permanent records yet.
+
+## Editing findings and highlighting evidence (Milestone 5B)
+
+In **Review Findings**, click **Edit** to change only a finding's title and
+explanation. **Save** updates the wording immediately; **Cancel** discards the
+unfinished draft. Both fields must contain text. You can edit one finding at a
+time. While editing, that finding's decision buttons are disabled until you save
+or cancel.
+
+Saving an accepted finding returns it to **pending**, even if you save the same
+wording, so you explicitly approve the final wording. Pending and rejected
+findings retain their decision. Changed wording is labeled **Human-edited wording**;
+expand **Original AI-generated wording** (or **Original rule-based wording**) to
+compare it with the original. Source quotes, page numbers, verification results,
+and finding IDs cannot be edited. Failed evidence still blocks acceptance.
+
+Each nonempty supporting quote has a **View in document** button. It searches
+only the claimed extracted page, scrolls there, and highlights the exact source
+text in yellow. Whitespace and PDF line breaks may differ, but words, numbers,
+punctuation, and capitalization must match. All matching occurrences on that
+page are highlighted; multiple matches are explicitly reported without claiming
+a unique location. If no match exists, a message explains that nothing was
+highlighted. The previous highlight is cleared when another quote is selected.
+Highlighting never searches an AI explanation or edited wording.
+
+### Safe browser test
+
+1. From your repository folder, activate the existing environment and start the
+   server with paid execution disabled for this session:
+
+   ```sh
+   source .venv/bin/activate
+   ENABLE_REAL_AI=false python -m uvicorn main:app --host 127.0.0.1 --port 8000
+   ```
+
+   If the server is already running, stop it with Control-C first, then run the
+   command above. Open http://127.0.0.1:8000/ and reload the page.
+2. Download the synthetic demo contract using the link on the webpage, upload
+   it, click **Analyze Document**, then **Analyze with AI (Demo)**. These steps
+   make no Anthropic requests.
+3. In **Review Findings**, accept the payment contradiction. Click **Edit**,
+   change its title and explanation, and click **Save**. Confirm the new wording
+   appears, the ID and evidence are unchanged, **Accepted** returns to zero,
+   and **To review** returns to three. Expand the original wording to compare.
+4. Accept the revised finding, edit it again, and click **Cancel**. Confirm the
+   saved wording and acceptance remain unchanged.
+5. Click **View in document** for each payment quote. Expect Page 1 to scroll
+   into view with the selected 10-day or 30-day sentence highlighted. The page
+   text itself stays unchanged.
+6. Click **View in document** for the intentionally invented quote. Expect a
+   clear no-match message and no highlight. Edit and save that finding; its
+   Accept button must remain disabled.
+7. To test repeated text, make a PDF in TextEdit with the following text using
+   Print → PDF → Save as PDF, then upload it:
+
+   ```text
+   Section 1.1 Payment
+   See Section 9.4.
+   See Section 9.4.
+   ```
+
+   Click **View in document** on either broken-reference finding. Both matching
+   excerpts should be highlighted, with a message that the quote does not
+   identify a unique location. Old demo findings, edits, and decisions disappear.
+8. Reload to confirm all findings, decisions, edits, and highlights disappear.
+
+### Offline automated tests
+
+With the Python environment active and Node.js 18+ available:
+
+```sh
+python -m unittest -v
+```
+
+The suite has **166 passing tests**, including **17 new tests** for saving and
+canceling edits, preserving original wording and evidence, resetting acceptance,
+failed-evidence protection, page navigation, exact and repeated quote matching,
+safe plain-text rendering, and clearing state for another upload. The Anthropic
+responses and frontend requests used by tests are mocked; tests make no real API
+requests.
+
+Limitations: edits and decisions live only in this browser tab's memory and are
+lost on reload or a new upload. There is no edit history, export, or permanent
+record. Unchanged AI reruns preserve saved edits and decisions; changed results
+become new pending findings. Human edits appear in the unified dashboard; the
+older source-specific result lists continue to show the original generated
+wording. Highlighting uses extracted text, not the PDF's visual layout. A
+truncated rule-based excerpt or altered punctuation/hyphenation may not match;
+there is no fuzzy matching or cross-page search. Overlapping matches share one
+highlighted span, while the occurrence count reports all matches. Quote presence
+does not establish a correct legal interpretation or human acceptance.
 
 ## Limits and document handling
 
