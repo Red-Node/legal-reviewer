@@ -1,16 +1,48 @@
-"""Preparation for future Claude calls; the PDF application does not call this module."""
+"""Local review helpers: offline demo and explicitly gated real Claude analysis."""
 
 import json
+import logging
 import os
 from pathlib import Path
 
-from anthropic import Anthropic
+from anthropic import (Anthropic, APIConnectionError, APITimeoutError, APIStatusError,
+                       AuthenticationError, PermissionDeniedError, NotFoundError, RateLimitError)
 from dotenv import load_dotenv
 
 from quote_verifier import verify_findings
 
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
+REAL_MAX_OUTPUT_TOKENS = 2048
+REAL_TIMEOUT_SECONDS = 30.0
+
+
+class ReviewError(ValueError):
+    """A static, safe message suitable for the local UI."""
+
+
+def get_real_review_settings():
+    """Return only public controls; missing flag always means disabled."""
+    load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+    try:
+        limit = int(os.getenv("AI_MAX_INPUT_BYTES", "20000"))
+        if limit < 1:
+            raise ValueError
+    except ValueError:
+        raise ReviewError("AI_MAX_INPUT_BYTES must be a positive integer. Real review is unavailable.") from None
+    return {
+        "enabled": os.getenv("ENABLE_REAL_AI", "").strip().lower() == "true",
+        "max_input_bytes": limit,
+        "max_output_tokens": REAL_MAX_OUTPUT_TOKENS,
+        "timeout_seconds": REAL_TIMEOUT_SECONDS,
+    }
+
+
+def _require_real_review_enabled():
+    settings = get_real_review_settings()
+    if not settings["enabled"]:
+        raise ReviewError("Real Claude review is disabled on the server. No Anthropic request was made.")
+    return settings
 
 # One-page synthetic fixture. Only whitespace variations are allowed in demo mode.
 DEMO_CONTRACT_TEXT = """Legal Reviewer Demo Contract
@@ -92,16 +124,19 @@ def get_configuration_status():
 
 
 def send_text_to_claude(text, *, system_prompt=None, max_tokens=1024):
-    """Future API entry point. Calling this with a real key makes a paid request.
+    """API entry point: requires the server flag and never retries automatically.
 
-    This function is deliberately not connected to uploads or the webpage.
-    In this milestone it is exercised only with a mocked SDK client.
+    Only the confirmed real-review route can reach this from the webpage.
+    In this milestone API execution is exercised only with a mocked SDK client.
     """
     if not isinstance(text, str) or not text.strip():
         raise ValueError("Provide non-empty text.")
+    settings = _require_real_review_enabled()
+    if len(text.encode("utf-8")) > settings["max_input_bytes"]:
+        raise ReviewError(f"Document text exceeds the {settings['max_input_bytes']}-byte AI limit. Nothing was sent; the contract was not truncated.")
     api_key, model = _read_configuration()
     if not api_key:
-        raise ValueError("Set ANTHROPIC_API_KEY before using the Claude function.")
+        raise ReviewError("Set ANTHROPIC_API_KEY locally before using the Claude function. Nothing was sent.")
 
     request = {
         "model": model,
@@ -110,8 +145,29 @@ def send_text_to_claude(text, *, system_prompt=None, max_tokens=1024):
     }
     if system_prompt is not None:
         request["system"] = system_prompt
-    with Anthropic(api_key=api_key) as client:
-        response = client.messages.create(**request)
+    request["max_tokens"] = min(max_tokens, REAL_MAX_OUTPUT_TOKENS)
+    # Keep SDK/transport debug logging from exposing request bodies or credentials.
+    for name in ("anthropic", "httpx2", "httpcore2"):
+        logger = logging.getLogger(name)
+        logger.handlers = [logging.NullHandler()]
+        logger.propagate = False
+    try:
+        with Anthropic(api_key=api_key, max_retries=0, timeout=REAL_TIMEOUT_SECONDS) as client:
+            response = client.messages.create(**request)
+    except APITimeoutError:
+        raise ReviewError("Claude review timed out. No automatic retry was made; charges may still apply. Check your account before trying again.") from None
+    except RateLimitError:
+        raise ReviewError("Anthropic rate limit reached. No automatic retry was made. Wait before submitting a new request.") from None
+    except AuthenticationError:
+        raise ReviewError("Anthropic rejected the API key. Check your local ANTHROPIC_API_KEY setting.") from None
+    except (PermissionDeniedError, NotFoundError):
+        raise ReviewError("The configured Claude model or account access is unavailable. Check ANTHROPIC_MODEL and your Anthropic access.") from None
+    except APIConnectionError:
+        raise ReviewError("Could not connect to Anthropic. No automatic retry was made; check your account before trying again.") from None
+    except APIStatusError:
+        raise ReviewError("Anthropic returned an API error. Check your model, account, and request limits. No automatic retry was made.") from None
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        raise ReviewError("Claude reached the output-token limit. The incomplete response was rejected; no automatic retry was made.")
     return "\n".join(block.text for block in response.content if block.type == "text")
 
 
@@ -196,16 +252,31 @@ def parse_analysis_response(response_text, page_numbers):
 
 
 def analyze_contract(pages):
-    """Future paid analysis entry point; exercise only with a mock in Milestone 4B.
+    """Gated analysis and parsing; exercise only with a mock in this milestone.
 
-    Not connected to PDF uploads or the webpage. This validates JSON structure,
-    not the accuracy of quotations, page assignments, or legal interpretations.
+    The real-review wrapper independently verifies quotes after parsing. This
+    function validates JSON structure, not accuracy or legal interpretations.
     """
     document_text = format_document_pages(pages)
     response = send_text_to_claude(
-        document_text, system_prompt=CONTRACT_SYSTEM_PROMPT, max_tokens=4096,
+        document_text, system_prompt=CONTRACT_SYSTEM_PROMPT, max_tokens=REAL_MAX_OUTPUT_TOKENS,
     )
     return parse_analysis_response(response, [page["number"] for page in pages])
+
+
+def review_contract_real(pages, *, confirmed=False):
+    """Future explicitly authorized flow, gated independently of browser controls."""
+    _require_real_review_enabled()
+    if confirmed is not True:
+        raise ReviewError("Confirm document transfer to Anthropic and possible API charges before real review.")
+    try:
+        parsed = analyze_contract(pages)
+    except ReviewError:
+        raise
+    except ValueError:
+        raise ReviewError("Claude returned an invalid structured response. No findings were displayed and no automatic retry was made.") from None
+    verified = verify_findings(parsed, pages)
+    return {**verified, "mode": "real", "message": "Claude findings with independent quote verification. Verified evidence does not confirm the legal interpretation."}
 
 
 def review_contract_demo(pages):

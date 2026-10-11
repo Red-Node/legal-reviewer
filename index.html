@@ -17,7 +17,7 @@
     button { border: 0; border-radius: 6px; padding: 12px 20px; background: #2457b5; color: white; font: inherit; cursor: pointer; }
     button:disabled { opacity: 0.6; cursor: wait; }
     button:focus-visible, input:focus-visible { outline: 3px solid #7da9f8; outline-offset: 4px; }
-    #error, #ai-error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
+    #error, #ai-error, #real-error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
     .verified { color: #185b35; background: #e7f5ec; }
     .verification_failed { color: #922020; background: #fce8e8; }
     .verification-status { display: inline-block; padding: 4px 8px; border-radius: 4px; }
@@ -97,6 +97,17 @@
         <p id="ai-message"></p>
         <ul id="ai-findings"></ul>
       </section>
+      <section id="real-panel" class="detections" aria-labelledby="real-heading" hidden>
+        <h2 id="real-heading">Claude Review Findings (Real AI)</h2>
+        <p class="validation-warning">Local development only. Real AI execution is disabled by default on the server. Future permitted requests send document text to Anthropic and may incur API charges.</p>
+        <p class="hint">These results are separate from the free demo and rule-based checks. Verified means quote presence only, not a correct legal conclusion or human approval.</p>
+        <p id="real-config" role="status">Checking local configuration…</p>
+        <button id="real-button" type="button">Analyze with Claude (Real AI)</button>
+        <p id="real-status" role="status" aria-live="polite"></p>
+        <p id="real-error" role="alert" hidden></p>
+        <p id="real-message"></p>
+        <ul id="real-findings"></ul>
+      </section>
     </section>
   </main>
 
@@ -130,9 +141,18 @@
     const aiError = document.getElementById("ai-error");
     const aiMessage = document.getElementById("ai-message");
     const aiFindings = document.getElementById("ai-findings");
+    const realPanel = document.getElementById("real-panel");
+    const realButton = document.getElementById("real-button");
+    const realConfig = document.getElementById("real-config");
+    const realStatus = document.getElementById("real-status");
+    const realError = document.getElementById("real-error");
+    const realMessage = document.getElementById("real-message");
+    const realFindings = document.getElementById("real-findings");
+    const localDevelopment = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
     // Only memory is used. A new upload/selection or page reload clears this state.
     let currentPages = null;
     let demoController = null;
+    let realController = null;
 
     function resetDemo() {
       currentPages = null;
@@ -144,6 +164,15 @@
       aiError.hidden = true;
       aiMessage.textContent = "";
       aiFindings.replaceChildren();
+      if (realController) realController.abort();
+      realController = null;
+      realPanel.hidden = true;
+      realButton.disabled = false;
+      realStatus.textContent = "";
+      realError.textContent = "";
+      realError.hidden = true;
+      realMessage.textContent = "";
+      realFindings.replaceChildren();
     }
 
     fileInput.addEventListener("change", () => {
@@ -162,6 +191,89 @@
       element.className = className;
       return element;
     }
+
+    function renderFindings(findings, list) {
+      for (const finding of findings) {
+        const item = document.createElement("li");
+        const title = document.createElement("strong");
+        title.textContent = `${finding.category} — ${finding.title}`;
+        const overallClass = finding.status === "verified" ? "verified" : "verification_failed";
+        item.append(title, paragraph(finding.explanation),
+          paragraph(`Overall verification: ${finding.status}`, `verification-status ${overallClass}`));
+        const evidenceList = document.createElement("ul");
+        for (const evidence of finding.evidence) {
+          const quoteItem = document.createElement("li");
+          const quoteClass = evidence.verification_status === "verified" ? "verified" : "verification_failed";
+          quoteItem.append(paragraph(`Page ${evidence.page} — “${evidence.quote}”`),
+            paragraph(`Quote verification: ${evidence.verification_status}`, `verification-status ${quoteClass}`),
+            paragraph(`Matches on claimed page: ${evidence.match_count}`));
+          if (evidence.failure_reason) quoteItem.append(paragraph(evidence.failure_reason));
+          evidenceList.append(quoteItem);
+        }
+        item.append(evidenceList);
+        for (const reason of finding.failure_reasons) item.append(paragraph(reason));
+        list.append(item);
+      }
+    }
+
+    async function showRealControls(reviewPages) {
+      if (!localDevelopment) return;
+      realPanel.hidden = false;
+      realConfig.textContent = "Checking local configuration…";
+      try {
+        // Configuration only; this GET never sends document text or calls Claude.
+        const response = await fetch("/ai-review-config", {cache: "no-store"});
+        const data = await response.json();
+        if (reviewPages !== currentPages) return;
+        if (!response.ok) throw new Error(data.detail || "Local configuration is unavailable.");
+        realConfig.textContent = `Server execution: ${data.enabled ? "enabled" : "disabled"}. Maximum input: ${data.max_input_bytes} UTF-8 bytes (including page markers). Output cap: ${data.max_output_tokens} tokens. No automatic retries.`;
+      } catch (failure) {
+        if (reviewPages === currentPages) realConfig.textContent = "Local configuration is unavailable. The server will still enforce its execution gate.";
+      }
+    }
+
+    realButton.addEventListener("click", async () => {
+      if (!currentPages || realButton.disabled || !localDevelopment) return;
+      // Only this explicit click can submit real review; cancel sends no request.
+      if (!window.confirm("Real Claude review will send this document's extracted text to Anthropic if enabled on the server. API charges may apply. Do you want to request real review?")) {
+        realStatus.textContent = "Cancelled. No document text was sent for real review.";
+        return;
+      }
+      const reviewPages = currentPages;
+      realController = new AbortController();
+      realButton.disabled = true;
+      realError.hidden = true;
+      realFindings.replaceChildren();
+      realMessage.textContent = "";
+      realStatus.textContent = "Requesting permitted real Claude review…";
+      try {
+        const response = await fetch("/ai-review-real", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({pages: reviewPages, confirmed: true}), cache: "no-store",
+          signal: realController.signal,
+        });
+        const data = await response.json();
+        if (reviewPages !== currentPages) return;
+        if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Real review failed. No automatic retry was made.");
+        if (data.mode !== "real" || !Array.isArray(data.findings)) throw new Error("Invalid real review response. No automatic retry was made.");
+        realMessage.textContent = data.message;
+        renderFindings(data.findings, realFindings);
+        realStatus.textContent = data.findings.length ? "Real Claude review complete." : "Claude returned no findings. This does not establish that the contract has no issues.";
+      } catch (failure) {
+        if (reviewPages !== currentPages || failure.name === "AbortError") return;
+        realFindings.replaceChildren();
+        realMessage.textContent = "";
+        realError.textContent = failure instanceof TypeError || failure instanceof SyntaxError ?
+          "The real review response could not be received. No automatic retry was made; check your account before trying again." : failure.message;
+        realError.hidden = false;
+        realStatus.textContent = "";
+      } finally {
+        if (reviewPages === currentPages) {
+          realButton.disabled = false;
+          realController = null;
+        }
+      }
+    });
 
     aiButton.addEventListener("click", async () => {
       if (!currentPages || aiButton.disabled) return;
@@ -183,27 +295,7 @@
         if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Demo review failed. Please try again.");
         if (data.mode !== "mock" || !Array.isArray(data.findings)) throw new Error("Unexpected demo response. Please try again.");
         aiMessage.textContent = data.message;
-        for (const finding of data.findings) {
-          const item = document.createElement("li");
-          const title = document.createElement("strong");
-          title.textContent = `${finding.category} — ${finding.title}`;
-          const overallClass = finding.status === "verified" ? "verified" : "verification_failed";
-          item.append(title, paragraph(finding.explanation),
-            paragraph(`Overall verification: ${finding.status}`, `verification-status ${overallClass}`));
-          const evidenceList = document.createElement("ul");
-          for (const evidence of finding.evidence) {
-            const quoteItem = document.createElement("li");
-            const quoteClass = evidence.verification_status === "verified" ? "verified" : "verification_failed";
-            quoteItem.append(paragraph(`Page ${evidence.page} — “${evidence.quote}”`),
-              paragraph(`Quote verification: ${evidence.verification_status}`, `verification-status ${quoteClass}`),
-              paragraph(`Matches on claimed page: ${evidence.match_count}`));
-            if (evidence.failure_reason) quoteItem.append(paragraph(evidence.failure_reason));
-            evidenceList.append(quoteItem);
-          }
-          item.append(evidenceList);
-          for (const reason of finding.failure_reasons) item.append(paragraph(reason));
-          aiFindings.append(item);
-        }
+        renderFindings(data.findings, aiFindings);
         aiStatus.textContent = data.findings.length ? "Demo review complete." : "Demo review complete — no mock findings for this document.";
       } catch (failure) {
         if (reviewPages !== currentPages || failure.name === "AbortError") return;
@@ -346,6 +438,7 @@
           data.candidate_term_uses.length === 0 || data.potentially_undefined_terms.length > 0;
         results.hidden = false;
         currentPages = data.pages;
+        showRealControls(currentPages);
         status.textContent = "Document processing complete.";
       } catch (failure) {
         showError(failure instanceof TypeError ? "Could not connect to the server. Check that the application is running and try again." : failure.message);

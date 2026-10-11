@@ -23,6 +23,8 @@ class AIReviewerTests(unittest.TestCase):
         network = patch("socket.socket.connect", side_effect=AssertionError("Network calls are forbidden in tests."))
         environment.start()
         self.addCleanup(environment.stop)
+        # Only fake credentials and a mocked client are used; never activate .env.
+        os.environ["ENABLE_REAL_AI"] = "true"
         self.load_dotenv = dotenv.start()
         self.addCleanup(dotenv.stop)
         self.sdk = sdk.start()
@@ -80,7 +82,7 @@ class AIReviewerTests(unittest.TestCase):
     def test_future_request_uses_mock_and_default_model(self):
         os.environ["ANTHROPIC_API_KEY"] = "fake-test-key"
         self.assertEqual(ai_reviewer.send_text_to_claude("Synthetic test text"), "Mock response")
-        self.sdk.assert_called_once_with(api_key="fake-test-key")
+        self.sdk.assert_called_once_with(api_key="fake-test-key", max_retries=0, timeout=30.0)
         self.client.messages.create.assert_called_once_with(
             model="claude-sonnet-5-5", max_tokens=1024,
             messages=[{"role": "user", "content": "Synthetic test text"}],
@@ -137,7 +139,7 @@ class AIReviewerTests(unittest.TestCase):
         request = self.client.messages.create.call_args.kwargs
         self.assertEqual(request["system"], ai_reviewer.CONTRACT_SYSTEM_PROMPT)
         self.assertEqual(request["model"], "claude-sonnet-5-5")
-        self.assertEqual(request["max_tokens"], 4096)
+        self.assertEqual(request["max_tokens"], 2048)
         self.assertEqual(request["messages"], [{"role": "user", "content":
             "[Page 1]\nPayment is due within 10 days.\nNotice must be sent promptly.\n\n"
             "[Page 2]\nPayment is due within 30 days."}])

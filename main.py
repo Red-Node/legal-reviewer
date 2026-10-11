@@ -1,11 +1,14 @@
 import json
+from ipaddress import ip_address
 from pathlib import Path
 
 import pymupdf
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 
-from ai_reviewer import DEMO_CONTRACT_TEXT, format_document_pages, review_contract_demo
+from ai_reviewer import (DEMO_CONTRACT_TEXT, ReviewError, format_document_pages,
+                         get_real_review_settings, review_contract_demo, review_contract_real)
 
 from detection import detect_sections_and_references, validate_references
 from terms import detect_terms, validate_terms
@@ -55,6 +58,62 @@ async def ai_review_demo(request: Request):
     except Exception:
         # Never include document text, mock response contents, or credentials in errors.
         raise HTTPException(status_code=500, detail="Demo review could not be processed. Please try again. No Anthropic API call was made.") from None
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+def _require_local_development(request):
+    try:
+        local = request.client is not None and ip_address(request.client.host).is_loopback
+    except ValueError:
+        local = False
+    if not local or request.url.hostname not in ("localhost", "127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="Real Claude review controls are available only on local development addresses.")
+
+
+@app.get("/ai-review-config")
+def real_review_configuration(request: Request):
+    _require_local_development(request)
+    try:
+        settings = get_real_review_settings()
+    except ReviewError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from None
+    return JSONResponse(settings, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/ai-review-real")
+async def real_review(request: Request):
+    _require_local_development(request)
+    if request.headers.get("origin") != str(request.base_url).rstrip("/"):
+        raise HTTPException(status_code=403, detail="Real review must be requested from this local application page.")
+    try:
+        settings = get_real_review_settings()
+    except ReviewError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from None
+    if not settings["enabled"]:
+        raise HTTPException(status_code=403, detail="Real Claude review is disabled on the server. No Anthropic request was made.")
+
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="Real review request exceeds 10 MB. Nothing was sent.")
+        body.extend(chunk)
+    try:
+        payload = json.loads(body)
+        if not isinstance(payload, dict) or set(payload) != {"pages", "confirmed"}:
+            raise ValueError
+        if payload["confirmed"] is not True:
+            raise HTTPException(status_code=400, detail="Confirmation of document transfer and possible API charges is required.")
+        pages = payload["pages"]
+        format_document_pages(pages)
+    except (ValueError, TypeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Provide valid document pages and explicit confirmation. Nothing was sent.") from None
+
+    try:
+        result = await run_in_threadpool(review_contract_real, pages, confirmed=True)
+    except ReviewError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+    except Exception:
+        raise HTTPException(status_code=502, detail="Claude review could not be processed safely. No automatic retry was made; check your account before trying again.") from None
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
 

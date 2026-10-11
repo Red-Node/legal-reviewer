@@ -21,6 +21,7 @@ then flags potential issues when a complete term's definition was not found.
 - `test_ai_reviewer.py`: tests configuration, contract analysis, and response validation with a mocked client.
 - `test_quote_verifier.py`: tests exact quote presence, failures, whitespace, and repeated occurrences.
 - `test_demo_review.py`: tests the demo endpoints, sample PDF upload, and guards against all real AI calls.
+- `test_real_review.py`: tests disabled real-review safeguards and future permitted requests with fake credentials and a mocked SDK.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -316,7 +317,7 @@ in this milestone.** These callable functions are future API entry points and
 would make a paid request if called with a real key. The model defaults to
 `claude-sonnet-5-5`, as in Milestone 4A. Real model behavior and availability have
 not been tested. The preparation sends a whole document in one request and has
-no long-document splitting; response output is limited to 4096 tokens. Large
+no long-document splitting; response output is capped at 2048 tokens. Large
 contracts or truncated responses may fail, and JSON validation does not assess
 completeness. There are no automatic legal conclusions or recommendations.
 
@@ -386,7 +387,8 @@ inactive in the app; do not call them with real credentials in this milestone.
 
 This is **Demo Mode — No Anthropic API calls**. The new button shows predefined
 mock AI responses, not newly generated analysis. No API key is required. There
-is no paid mode toggle or real-AI endpoint.
+is no browser paid-mode toggle. Milestone 4D-2A adds a separate real-AI endpoint
+that remains disabled by default on the server.
 
 From Terminal in your cloned repository folder, run:
 
@@ -474,6 +476,92 @@ or analyze arbitrary contracts. Verification still confirms quote presence only,
 with the whitespace and extraction limitations described above. No human
 Accept / Reject / Edit workflow is implemented.
 
+## Real Claude preparation, disabled by default (Milestone 4D-2A)
+
+**No paid requests are authorized or performed in this milestone.** Real review
+is gated by a server-only flag, `ENABLE_REAL_AI`. If absent or not `true`, all real
+API entry points refuse execution before creating an Anthropic client. Browser
+requests cannot enable this flag, supply an API key, or increase the output cap.
+The example configuration keeps it disabled:
+
+```dotenv
+ANTHROPIC_API_KEY=your_key_here
+ANTHROPIC_MODEL=claude-sonnet-5-5
+ENABLE_REAL_AI=false
+AI_MAX_INPUT_BYTES=20000
+```
+
+`AI_MAX_INPUT_BYTES` is the maximum UTF-8 byte length of the complete document
+text with page markers; it defaults to 20,000. Oversized text is rejected before
+any API client is created, rather than silently truncating the contract. This is
+a byte limit, not an estimate of tokens or cost. Output is capped at 2,048 tokens,
+SDK timeout is 30 seconds, and `max_retries=0` disables SDK retries as documented
+in the [official Anthropic SDK guidance](https://github.com/anthropics/skills/blob/main/skills/claude-api/python/claude-api/README.md).
+SDK/transport logs are suppressed during calls so debug logging does not expose
+document text or credentials. Do not add logging of documents or API errors.
+
+After a successful PDF upload on localhost, a separate **Analyze with Claude
+(Real AI)** button appears under **Claude Review Findings (Real AI)**. It does not
+run on page load, upload, or demo review. The adjacent configuration message shows
+whether server execution is enabled; reading configuration never contacts Claude
+or exposes the API key. Before submitting, the button opens a confirmation dialog
+explaining document transfer to Anthropic and possible charges. Cancel sends
+nothing. Confirming while the server is disabled still returns a disabled message
+without contacting Anthropic. The free demo button is unaffected.
+
+The server permits the real controls only for loopback clients and local hostnames.
+The real endpoint also requires the matching local Origin header and a literal
+`confirmed: true`. These are development safeguards, not production authentication:
+do not expose this app publicly or enable paid mode behind a reverse proxy.
+
+For a future permitted request, `review_contract_real()` reuses `analyze_contract()`
+and the structured parser, then passes every quote to `verify_findings()` before
+returning results. Failed quotes remain visible. Real results are shown in their
+own panel and never replace the demo or rule-based results. Missing keys, rejected
+credentials, unavailable models, rate limits, connection failures, timeouts,
+truncated or malformed responses, and other failures produce safe messages without
+raw API error text or credentials. There is no automatic retry or fallback.
+
+Safe testing now:
+
+1. Keep `ENABLE_REAL_AI=false` (or leave it unset) and run the local app as above.
+2. Upload the synthetic demo PDF and confirm the free demo still works.
+3. Check the real panel says **Server execution: disabled**.
+4. Click the real button and choose **Cancel**; no real-review submission occurs.
+5. You may also confirm while the server is disabled: expect the disabled message,
+   with no Anthropic request. Do not change the flag during this milestone.
+6. Run `python -m unittest -v`. Tests ignore `.env`, use only fake credentials,
+   mock the SDK, and block network access. Enabled-mode cases exist only in isolated
+   mocked test environments, never as activation of your running server.
+
+Before the **first paid test**, wait for explicit approval. Then, in a future
+authorized step:
+
+1. Stop the local server. Use a small synthetic contract whose text you are
+   authorized to send, and decide your spending limit in advance. The token cap
+   does not impose an account-level spending limit.
+2. Configure your own key privately in `.env`, confirm your Anthropic account has
+   access to `claude-sonnet-5-5`, and choose an appropriate `AI_MAX_INPUT_BYTES`.
+   Keep `.env` excluded from Git. Never paste the key into chat or the browser.
+3. Only after approval, change the local `.env` line to `ENABLE_REAL_AI=true`.
+   Existing shell environment variables override `.env`; make sure you understand
+   those settings. This README describes activation; this milestone does not do it.
+4. Start the server bound to loopback:
+   `python -m uvicorn main:app --host 127.0.0.1 --port 8000`.
+   Upload the small synthetic PDF and check the real panel reports enabled.
+5. Click the real button once, read the disclosure, and confirm once. Inspect the
+   returned quote verification and your Anthropic usage before submitting again.
+6. Stop the server, restore `ENABLE_REAL_AI=false`, and restart it. Check the panel
+   reports disabled again.
+
+Limitations: a timeout, browser cancellation, file change, or page reload does not
+guarantee cancellation of a request already accepted by Anthropic; charges may
+still apply. The timeout is an SDK timeout, not a guarantee of a strict overall
+wall-clock deadline. There is no persistent document storage, but a future
+approved real request will disclose text to Anthropic. Real model behavior, model
+availability, and costs have not been tested here. Quote presence does not establish
+legal correctness. No Accept / Reject / Edit workflow is implemented.
+
 ## Limits and document handling
 
 - The size limit is 10 × 1024 × 1024 bytes and is checked in both the browser and server.
@@ -513,6 +601,7 @@ Accept / Reject / Edit workflow is implemented.
   page breaks can affect detection. Excerpts keep
   original words and punctuation while joining whitespace and truncating long context.
 
-Real Claude integration is prepared but inactive. The application uses deterministic
-rules and a local mock AI demo; it sends no uploaded documents to external APIs.
-There is no real AI analysis, document editing, or database storage.
+Real Claude integration is disabled by default. The application uses deterministic
+rules and a local mock AI demo. Only a future explicitly enabled and confirmed
+real request would send document text to Anthropic. There is no document editing
+or database storage.
