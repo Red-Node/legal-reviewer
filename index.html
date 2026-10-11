@@ -17,7 +17,11 @@
     button { border: 0; border-radius: 6px; padding: 12px 20px; background: #2457b5; color: white; font: inherit; cursor: pointer; }
     button:disabled { opacity: 0.6; cursor: wait; }
     button:focus-visible, input:focus-visible { outline: 3px solid #7da9f8; outline-offset: 4px; }
-    #error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
+    #error, #ai-error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
+    .verified { color: #185b35; background: #e7f5ec; }
+    .verification_failed { color: #922020; background: #fce8e8; }
+    .verification-status { display: inline-block; padding: 4px 8px; border-radius: 4px; }
+    .demo-label { font-weight: 600; color: #714d00; }
     #summary { overflow-wrap: anywhere; }
     .page h2 { margin-top: 0; font-size: 20px; }
     .detections h2 { margin-top: 0; font-size: 20px; }
@@ -37,6 +41,7 @@
       <label for="pdf-file">Choose a PDF document</label>
       <input id="pdf-file" type="file" accept=".pdf,application/pdf" aria-describedby="upload-hint">
       <p class="hint" id="upload-hint">Maximum size: 10 MB. Use a PDF with selectable text. Uploaded documents are not permanently stored.</p>
+      <p class="hint"><a href="/demo-contract.pdf">Download the synthetic demo contract</a> to test the mock AI review.</p>
       <button id="analyze-button" type="submit">Analyze Document</button>
     </form>
 
@@ -45,6 +50,7 @@
     <section id="results" aria-label="Extracted document text" hidden>
       <h2 id="summary"></h2>
       <div id="pages"></div>
+      <h2>Rule-based Checks</h2>
       <section class="detections" aria-labelledby="sections-heading">
         <h2 id="sections-heading">Detected Sections</h2>
         <ul id="detected-sections"></ul>
@@ -81,6 +87,16 @@
         <p id="no-undefined-term-candidates" hidden>No candidate term uses to validate.</p>
         <p id="no-undefined-terms" hidden>No potentially undefined terms detected among recognized terms.</p>
       </section>
+      <section class="detections" aria-labelledby="ai-heading">
+        <h2 id="ai-heading">AI Review Findings</h2>
+        <p class="demo-label">Demo Mode — No Anthropic API calls</p>
+        <p class="hint">These are predefined mock AI findings, separate from the rule-based checks above. Verified means the evidence text exists on the claimed page, not that the legal conclusion is correct or approved by a human.</p>
+        <button id="ai-demo-button" type="button">Analyze with AI (Demo)</button>
+        <p id="ai-status" role="status" aria-live="polite"></p>
+        <p id="ai-error" role="alert" hidden></p>
+        <p id="ai-message"></p>
+        <ul id="ai-findings"></ul>
+      </section>
     </section>
   </main>
 
@@ -109,6 +125,101 @@
     const noUndefinedTermCandidates = document.getElementById("no-undefined-term-candidates");
     const noUndefinedTerms = document.getElementById("no-undefined-terms");
     const maxFileSize = 10 * 1024 * 1024;
+    const aiButton = document.getElementById("ai-demo-button");
+    const aiStatus = document.getElementById("ai-status");
+    const aiError = document.getElementById("ai-error");
+    const aiMessage = document.getElementById("ai-message");
+    const aiFindings = document.getElementById("ai-findings");
+    // Only memory is used. A new upload/selection or page reload clears this state.
+    let currentPages = null;
+    let demoController = null;
+
+    function resetDemo() {
+      currentPages = null;
+      if (demoController) demoController.abort();
+      demoController = null;
+      aiButton.disabled = false;
+      aiStatus.textContent = "";
+      aiError.textContent = "";
+      aiError.hidden = true;
+      aiMessage.textContent = "";
+      aiFindings.replaceChildren();
+    }
+
+    fileInput.addEventListener("change", () => {
+      resetDemo();
+      results.hidden = true;
+      summary.textContent = "";
+      for (const list of [pages, detectedSections, sectionReferences, brokenReferences,
+        definedTerms, candidateTermUses, potentiallyUndefinedTerms]) list.replaceChildren();
+      status.textContent = "";
+      error.hidden = true;
+    });
+
+    function paragraph(text, className = "") {
+      const element = document.createElement("p");
+      element.textContent = text;
+      element.className = className;
+      return element;
+    }
+
+    aiButton.addEventListener("click", async () => {
+      if (!currentPages || aiButton.disabled) return;
+      const reviewPages = currentPages;
+      demoController = new AbortController();
+      aiButton.disabled = true;
+      aiError.hidden = true;
+      aiFindings.replaceChildren();
+      aiMessage.textContent = "";
+      aiStatus.textContent = "Running local mock review and quote verification…";
+      try {
+        const response = await fetch("/ai-review-demo", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pages: reviewPages }), cache: "no-store",
+          signal: demoController.signal,
+        });
+        const data = await response.json();
+        if (reviewPages !== currentPages) return;
+        if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Demo review failed. Please try again.");
+        if (data.mode !== "mock" || !Array.isArray(data.findings)) throw new Error("Unexpected demo response. Please try again.");
+        aiMessage.textContent = data.message;
+        for (const finding of data.findings) {
+          const item = document.createElement("li");
+          const title = document.createElement("strong");
+          title.textContent = `${finding.category} — ${finding.title}`;
+          const overallClass = finding.status === "verified" ? "verified" : "verification_failed";
+          item.append(title, paragraph(finding.explanation),
+            paragraph(`Overall verification: ${finding.status}`, `verification-status ${overallClass}`));
+          const evidenceList = document.createElement("ul");
+          for (const evidence of finding.evidence) {
+            const quoteItem = document.createElement("li");
+            const quoteClass = evidence.verification_status === "verified" ? "verified" : "verification_failed";
+            quoteItem.append(paragraph(`Page ${evidence.page} — “${evidence.quote}”`),
+              paragraph(`Quote verification: ${evidence.verification_status}`, `verification-status ${quoteClass}`),
+              paragraph(`Matches on claimed page: ${evidence.match_count}`));
+            if (evidence.failure_reason) quoteItem.append(paragraph(evidence.failure_reason));
+            evidenceList.append(quoteItem);
+          }
+          item.append(evidenceList);
+          for (const reason of finding.failure_reasons) item.append(paragraph(reason));
+          aiFindings.append(item);
+        }
+        aiStatus.textContent = data.findings.length ? "Demo review complete." : "Demo review complete — no mock findings for this document.";
+      } catch (failure) {
+        if (reviewPages !== currentPages || failure.name === "AbortError") return;
+        aiFindings.replaceChildren();
+        aiMessage.textContent = "";
+        aiError.textContent = failure instanceof TypeError ? "Could not connect to the local server. Please try again." :
+          failure instanceof SyntaxError ? "The demo response could not be read. Please try again." : failure.message;
+        aiError.hidden = false;
+        aiStatus.textContent = "";
+      } finally {
+        if (reviewPages === currentPages) {
+          aiButton.disabled = false;
+          demoController = null;
+        }
+      }
+    });
 
     function showError(message) {
       error.textContent = message;
@@ -130,6 +241,7 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      resetDemo();
       error.hidden = true;
       results.hidden = true;
       pages.replaceChildren();
@@ -233,6 +345,7 @@
         noUndefinedTerms.hidden = Boolean(data.term_validation_warning) ||
           data.candidate_term_uses.length === 0 || data.potentially_undefined_terms.length > 0;
         results.hidden = false;
+        currentPages = data.pages;
         status.textContent = "Document processing complete.";
       } catch (failure) {
         showError(failure instanceof TypeError ? "Could not connect to the server. Check that the application is running and try again." : failure.message);

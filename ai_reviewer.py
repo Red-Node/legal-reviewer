@@ -7,8 +7,44 @@ from pathlib import Path
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
+from quote_verifier import verify_findings
+
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
+
+# One-page synthetic fixture. Only whitespace variations are allowed in demo mode.
+DEMO_CONTRACT_TEXT = """Legal Reviewer Demo Contract
+Section 1.1 Payment
+Payment is due within 10 days.
+Section 1.2 Payment Deadline
+Payment is due within 30 days.
+Section 1.3 Notice
+Notice must be sent promptly."""
+
+DEMO_RESPONSE = json.dumps({"findings": [
+    {
+        "id": "D1", "category": "contradiction",
+        "title": "Potentially inconsistent payment deadlines",
+        "explanation": "These clauses may specify different deadlines for the same payment.",
+        "evidence": [
+            {"quote": "Payment is due within 10 days.", "page": 1},
+            {"quote": "Payment is due within 30 days.", "page": 1},
+        ],
+        "status": "unverified",
+    },
+    {
+        "id": "D2", "category": "ambiguity", "title": "Unclear notice deadline",
+        "explanation": "The word promptly does not specify a notice deadline.",
+        "evidence": [{"quote": "Notice must be sent promptly.", "page": 1}],
+        "status": "unverified",
+    },
+    {
+        "id": "D3", "category": "ambiguity", "title": "Intentionally invented evidence",
+        "explanation": "This mock finding deliberately includes a fabricated quote to demonstrate verification failure.",
+        "evidence": [{"quote": "The investor may cancel at any time.", "page": 1}],
+        "status": "unverified",
+    },
+]})
 
 CONTRACT_SYSTEM_PROMPT = """You are a document quality-control assistant, not legal counsel.
 Analyze only the supplied contract for potential contradictions between clauses
@@ -170,3 +206,24 @@ def analyze_contract(pages):
         document_text, system_prompt=CONTRACT_SYSTEM_PROMPT, max_tokens=4096,
     )
     return parse_analysis_response(response, [page["number"] for page in pages])
+
+
+def review_contract_demo(pages):
+    """Mock-only flow: never call analyze_contract, send_text, or the SDK client."""
+    document = format_document_pages(pages)
+    expected = format_document_pages([{"number": 1, "text": DEMO_CONTRACT_TEXT}])
+    matches_demo = (len(pages) == 1 and pages[0]["number"] == 1
+                    and " ".join(document.split()) == " ".join(expected.split()))
+    # Require the complete one-page fixture, not merely a few matching quotes.
+    response = DEMO_RESPONSE if matches_demo else '{"findings": []}'
+    parsed = parse_analysis_response(response, [page["number"] for page in pages])
+    verified = verify_findings(parsed, pages)
+    return {
+        **verified,
+        "mode": "mock",
+        "message": (
+            "Synthetic demo contract recognized. Showing three predefined mock findings, including intentionally invented evidence."
+            if matches_demo else
+            "No mock findings: this document does not match the complete one-page synthetic demo contract. No AI analysis was performed."
+        ),
+    }

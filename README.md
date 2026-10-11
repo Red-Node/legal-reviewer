@@ -9,10 +9,10 @@ then flags potential issues when a complete term's definition was not found.
 
 ## Files
 
-- `main.py`: serves the webpage and handles PDF uploads and text extraction.
+- `main.py`: serves the webpage, handles PDF uploads, generates the demo PDF, and exposes the mock-only review endpoint.
 - `detection.py`: identifies headings and references, then compares exact section numbers.
 - `terms.py`: detects definitions and candidate uses, then checks for potential missing definitions.
-- `ai_reviewer.py`: reads Claude configuration and prepares contract analysis with JSON validation; inactive in the app.
+- `ai_reviewer.py`: prepares real Claude analysis (inactive), and provides the synthetic mock review using the existing JSON parser and quote verifier.
 - `quote_verifier.py`: independently checks evidence quotes against their claimed original pages, entirely offline.
 - `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
@@ -20,6 +20,7 @@ then flags potential issues when a complete term's definition was not found.
 - `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
 - `test_ai_reviewer.py`: tests configuration, contract analysis, and response validation with a mocked client.
 - `test_quote_verifier.py`: tests exact quote presence, failures, whitespace, and repeated occurrences.
+- `test_demo_review.py`: tests the demo endpoints, sample PDF upload, and guards against all real AI calls.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -242,7 +243,7 @@ the same. You can upload a PDF as before to check the existing features.
 
 This milestone prepares analysis of **potential contradictions** between clauses
 and **ambiguities** in terms or obligations. It runs only in offline tests with
-mocked Claude responses. There is no **Analyze with AI** button, and no uploaded
+mocked Claude responses. Milestone 4D-1 below adds a **demo-only** review button; no uploaded
 document is sent to Anthropic.
 
 The proposed flow is:
@@ -323,7 +324,7 @@ completeness. There are no automatic legal conclusions or recommendations.
 
 `quote_verifier.py` checks whether evidence actually occurs on the claimed page
 of the **original extracted PDF text**. It needs no API key and has no network
-or Anthropic dependencies. It is not connected to the webpage yet.
+or Anthropic dependencies. Milestone 4D-1 below connects it to the mock review panel.
 
 Pass the parsed analysis and the original `pages` list to:
 
@@ -381,6 +382,98 @@ python -m unittest -v
 No real API calls or document transfers are involved. The AI entry points remain
 inactive in the app; do not call them with real credentials in this milestone.
 
+## Mock AI review in the browser (Milestone 4D-1)
+
+This is **Demo Mode — No Anthropic API calls**. The new button shows predefined
+mock AI responses, not newly generated analysis. No API key is required. There
+is no paid mode toggle or real-AI endpoint.
+
+From Terminal in your cloned repository folder, run:
+
+```sh
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Then test this exact flow:
+
+1. Open http://127.0.0.1:8000/ and reload if the app was already open.
+2. Click **Download the synthetic demo contract** above the upload button. This
+   downloads `legal-reviewer-demo.pdf`, generated in memory by the local server.
+3. Choose that downloaded PDF and click **Analyze Document**. The extracted page
+   and all previous section and term checks should remain visible under
+   **Rule-based Checks**. The **AI Review Findings** panel and **Analyze with AI
+   (Demo)** button appear only after a successful upload.
+4. Click **Analyze with AI (Demo)**. Expect three mock findings:
+   - A potential contradiction comparing the 10-day and 30-day payment clauses.
+     Both quotes and the overall finding are green and marked `verified`.
+   - An ambiguity about “promptly”. Its quote and overall status are `verified`.
+   - An intentionally invented quote about cancellation. Its quote and overall
+     status are red and marked `verification_failed`; a failure reason and zero
+     matches are displayed. This is a demonstration of rejecting fabricated evidence.
+5. Check that each result includes its category, title, explanation, quotes,
+   claimed pages, individual verification statuses, and overall status. The
+   panel explains that verified evidence does not establish a legal conclusion.
+6. Select a different readable PDF and process it. Previous demo results clear.
+   Clicking the demo button should return no findings and explain that the
+   document does not match the synthetic fixture. This does **not** mean the
+   document has no issues; no AI analysis was performed.
+7. To test a connection failure, stop the server with **Control+C** after an
+   upload, then click the demo button. The panel should show a connection error
+   while keeping the extracted text and rule-based results. Restart the server
+   with the command above and try the demo button again.
+
+The fixture is one page containing exactly this text:
+
+```text
+Legal Reviewer Demo Contract
+Section 1.1 Payment
+Payment is due within 10 days.
+Section 1.2 Payment Deadline
+Payment is due within 30 days.
+Section 1.3 Notice
+Notice must be sent promptly.
+```
+
+The backend compares the **entire extracted document**, including its one-page
+layout, against this fixture, allowing whitespace differences only. Matching
+filenames or a few matching quotes are insufficient. Changed words, extra clauses,
+page headers, or extra pages receive an empty mock result. A different PDF with
+exactly the same extracted page text is equivalent for this demo.
+
+The browser sends the extracted pages to the local `/ai-review-demo` endpoint.
+It calls `review_contract_demo()`, which selects the fixture response or an empty
+response, then reuses `parse_analysis_response()` and `verify_findings()`. It
+never calls the Anthropic client or the real analysis functions, even with an API
+key configured. Malformed mock output or processing errors return a generic error
+without document contents or credentials. There is no fallback to real AI.
+
+Page text is kept in browser memory for the current flow and in server memory
+only for each request. A new file selection, new upload, or page reload clears
+the demo state. There is no server document cache, localStorage, database, or
+application save to disk. Upload and demo responses use `Cache-Control: no-store`;
+the app does not log document text. The existing PDF upload may use temporary
+multipart files, which are closed and cleaned up as described below. The sample
+download is a synthetic file you intentionally save, not a saved upload.
+
+Run the offline suite:
+
+```sh
+python -m unittest -v
+```
+
+The demo tests block network connections and assert that the SDK client, real AI
+entry points, and credential loader are never invoked. They cover the sample
+download → PDF extraction → mock review → quote verification flow, unrelated
+documents, invalid input, oversized requests, malformed mock output, processing
+errors, and independent requests. Demo JSON requests have a 10 MB size limit.
+
+Limitations: the mock results are fixed, so this does not test Claude's reasoning
+or analyze arbitrary contracts. Verification still confirms quote presence only,
+with the whitespace and extraction limitations described above. No human
+Accept / Reject / Edit workflow is implemented.
+
 ## Limits and document handling
 
 - The size limit is 10 × 1024 × 1024 bytes and is checked in both the browser and server.
@@ -420,6 +513,6 @@ inactive in the app; do not call them with real credentials in this milestone.
   page breaks can affect detection. Excerpts keep
   original words and punctuation while joining whitespace and truncating long context.
 
-Claude integration is prepared but inactive. The application uses deterministic
-rules and sends no uploaded documents to external APIs. There is no AI analysis,
-document editing, or database storage.
+Real Claude integration is prepared but inactive. The application uses deterministic
+rules and a local mock AI demo; it sends no uploaded documents to external APIs.
+There is no real AI analysis, document editing, or database storage.
