@@ -1,4 +1,4 @@
-"""Detect explicit definitions and candidate term uses without judging validity."""
+"""Detect terms and flag potential issues when an exact definition is not found."""
 
 import re
 
@@ -69,3 +69,70 @@ def detect_terms(pages):
             })
 
     return {"defined_terms": defined_terms, "candidate_term_uses": candidate_term_uses}
+
+
+def normalize_term_name(term):
+    """Remove surrounding quotes and extra whitespace, preserving case and words."""
+    term = term.strip()
+    if len(term) >= 2 and (term[0], term[-1]) in {('"', '"'), ("“", "”")}:
+        term = term[1:-1].strip()
+    return " ".join(term.split())
+
+
+def is_numbered_section_reference(candidate, references):
+    """Ignore phrases such as 'Refer To Section' immediately before a number."""
+    words = normalize_term_name(candidate["term"]).split()
+    if not words or words[-1].lower() not in {"section", "sections"}:
+        return False
+    pattern = r"\b" + r"\s+".join(re.escape(word) for word in words) + r"\s+\d"
+    if re.search(pattern, candidate["excerpt"]):
+        return True
+    # A number may wrap onto the next line, outside the candidate's excerpt.
+    # Use the existing reference detector's page and original context to confirm it.
+    for reference in references:
+        if reference["page"] == candidate["page"] and re.match(
+            re.escape(candidate["excerpt"]) + r"\s+\d", reference["excerpt"]
+        ):
+            return True
+    return False
+
+
+def validate_terms(defined_terms, candidate_term_uses, sections=(), references=()):
+    """Compare complete names after all pages have been read; retain every use.
+
+    A missing detected definition is only a potential issue. Recognized heading
+    occurrences are ignored using their page, term, and original excerpt together.
+    """
+    if not defined_terms:
+        return {
+            "potentially_undefined_terms": [],
+            "term_validation_warning": (
+                "No explicit term definitions were detected. Term validation is unreliable, "
+                "so potential undefined-term issues could not be determined."
+            ),
+        }
+
+    defined_names = {normalize_term_name(item["term"]) for item in defined_terms}
+    # Detect candidates in each known heading to identify its exact occurrences.
+    # This also handles long headings whose candidate excerpts are truncated.
+    heading_uses = set()
+    for section in sections:
+        heading_terms = detect_terms([{"number": section["page"], "text": section["text"]}])
+        for candidate in heading_terms["candidate_term_uses"]:
+            heading_uses.add((candidate["term"], candidate["page"], candidate["excerpt"]))
+
+    findings = []
+    for candidate in candidate_term_uses:
+        occurrence = (candidate["term"], candidate["page"], candidate["excerpt"])
+        if occurrence in heading_uses or is_numbered_section_reference(candidate, references):
+            continue
+        term = normalize_term_name(candidate["term"])
+        if term not in defined_names:
+            findings.append({
+                **candidate,
+                "term": term,
+                "status": "Definition not found",
+                "explanation": "Potential issue: no matching definition was detected. A definition may have been missed.",
+            })
+
+    return {"potentially_undefined_terms": findings, "term_validation_warning": None}

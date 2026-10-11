@@ -4,16 +4,17 @@ A minimal PDF text reader built with Python, FastAPI, PyMuPDF, and plain HTML,
 CSS, and JavaScript. It extracts text by page and uses deterministic rules to
 detect numbered section headings and explicit section references, then flag
 references whose targets were not found among recognized headings. It also detects
-explicit term definitions and candidate uses of capitalized multi-word terms.
+explicit term definitions and candidate uses of capitalized multi-word terms,
+then flags potential issues when a complete term's definition was not found.
 
 ## Files
 
 - `main.py`: serves the webpage and handles PDF uploads and text extraction.
 - `detection.py`: identifies headings and references, then compares exact section numbers.
-- `terms.py`: detects quoted definitions and candidate term uses without checking for undefined terms.
+- `terms.py`: detects definitions and candidate uses, then checks for potential missing definitions.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
 - `test_detection.py`: tests detection, potential broken references, and existing PDF uploads.
-- `test_terms.py`: tests term detection and its integration with existing PDF results.
+- `test_terms.py`: tests term detection, validation, and integration with existing PDF results.
 - `requirements.txt`: lists the Python packages needed to run the app.
 - `.gitignore`: excludes local files such as `.env` and `.venv` from Git.
 
@@ -125,8 +126,46 @@ candidate uses; uses of other terms inside a definition's body can still be list
 
 Move the usage sentences to a second page to check page numbers. You can also
 add `The Notice Period ends tomorrow.` to see a candidate that has no detected
-definition. It is only listed as a candidate; this milestone does not identify
-undefined-term errors. Existing section and cross-reference results remain visible.
+definition. It should also appear as a potential issue in **Potentially Undefined
+Terms**, with the status “Definition not found”. Existing section and cross-reference
+results remain visible.
+
+## Test potentially undefined terms
+
+Create a PDF from this text:
+
+```text
+Section 2.1 Payment Terms
+“Closing Date” shall mean the date specified in the notice.
+The Closing Date is tomorrow.
+The Final Closing Date may change.
+The Notice Period ends tomorrow.
+Refer To Section 2.1 for details.
+```
+
+After uploading, **Potentially Undefined Terms** should show Final Closing Date
+and Notice Period, each with its page, original excerpt, and “Definition not found”
+status. Closing Date matches its definition exactly. The recognized Payment Terms
+heading and the numbered section reference should not become term findings, though
+they may remain in the **Candidate Term Uses** list.
+
+Try these variations:
+
+1. Add `"Final Closing Date" means the amended date.` and
+   `"Notice Period" means the time allowed for notice.` on a later page.
+   You should see “No potentially undefined terms detected among recognized terms.”
+2. Repeat `The Notice Period ends tomorrow.` on multiple pages while its
+   definition is absent. Every detected occurrence and page should be retained.
+3. Remove all definitions but keep the usage sentences. The app should warn that
+   validation is unreliable and avoid automatically flagging candidates.
+4. Upload a PDF containing only `"Investor" means a subscriber.`. You should
+   see “No candidate term uses to validate.”
+
+Complete names are compared case-sensitively after extra whitespace and surrounding
+straight/curly double quotes are removed. Final Closing Date does not match Closing
+Date, and Business Days does not match Business Day. A definition on any page counts.
+Every finding is a **potential issue**, because the limited detector may miss a
+definition. The app does not establish that a term is definitively undefined.
 
 ## Run automated tests
 
@@ -169,9 +208,13 @@ The tests create sample PDF data in memory; no test documents are stored.
 - Candidate uses contain two to six consecutive capitalized words on one extracted
   line. Common prefixes such as “The” are removed. Single-word uses such as Investor,
   lowercase uses, and phrases with lowercase connecting words may be missed.
-- Proper names and headings can resemble candidate terms. Repeated occurrences
-  are kept; definition meanings, scope, and whether a candidate is undefined are
-  not checked. PDF formatting and page breaks can affect detection. Excerpts keep
+- Proper names and headings can resemble candidate terms. Recognized numbered
+  headings and identifiable numbered section-reference phrases are excluded from
+  term findings; unrecognized headings and proper names may still cause false warnings.
+  Repeated occurrences are kept. Definition meanings and scope are not checked;
+  definitions using other patterns or in another document may be missed. With no
+  detected definitions, validation is skipped with a warning. PDF formatting and
+  page breaks can affect detection. Excerpts keep
   original words and punctuation while joining whitespace and truncating long context.
 
 There is no AI, legal analysis, editing, database, or external API integration.

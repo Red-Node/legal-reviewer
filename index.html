@@ -73,6 +73,14 @@
         <ul id="candidate-term-uses"></ul>
         <p id="no-candidate-term-uses" hidden>No candidate term uses detected.</p>
       </section>
+      <section class="detections" aria-labelledby="undefined-terms-heading">
+        <h2 id="undefined-terms-heading">Potentially Undefined Terms</h2>
+        <p class="hint">Each finding is a potential issue for review. The limited detector may have missed a definition.</p>
+        <p id="term-validation-warning" class="validation-warning" role="status" hidden></p>
+        <ul id="potentially-undefined-terms"></ul>
+        <p id="no-undefined-term-candidates" hidden>No candidate term uses to validate.</p>
+        <p id="no-undefined-terms" hidden>No potentially undefined terms detected among recognized terms.</p>
+      </section>
     </section>
   </main>
 
@@ -96,6 +104,10 @@
     const candidateTermUses = document.getElementById("candidate-term-uses");
     const noDefinedTerms = document.getElementById("no-defined-terms");
     const noCandidateTermUses = document.getElementById("no-candidate-term-uses");
+    const potentiallyUndefinedTerms = document.getElementById("potentially-undefined-terms");
+    const termValidationWarning = document.getElementById("term-validation-warning");
+    const noUndefinedTermCandidates = document.getElementById("no-undefined-term-candidates");
+    const noUndefinedTerms = document.getElementById("no-undefined-terms");
     const maxFileSize = 10 * 1024 * 1024;
 
     function showError(message) {
@@ -126,6 +138,11 @@
       brokenReferences.replaceChildren();
       definedTerms.replaceChildren();
       candidateTermUses.replaceChildren();
+      potentiallyUndefinedTerms.replaceChildren();
+      termValidationWarning.textContent = "";
+      termValidationWarning.hidden = true;
+      noUndefinedTermCandidates.hidden = true;
+      noUndefinedTerms.hidden = true;
       validationWarning.textContent = "";
       validationWarning.hidden = true;
       noBrokenReferences.hidden = true;
@@ -199,6 +216,22 @@
         noBrokenReferences.hidden = Boolean(data.validation_warning) || data.broken_references.length > 0;
         renderTerms(data.defined_terms, definedTerms, noDefinedTerms);
         renderTerms(data.candidate_term_uses, candidateTermUses, noCandidateTermUses);
+        for (const term of data.potentially_undefined_terms) {
+          const item = document.createElement("li");
+          const label = document.createElement("strong");
+          label.textContent = `Potential issue: ${term.term} (Page ${term.page}) — ${term.status}`;
+          const excerpt = document.createElement("p");
+          excerpt.textContent = `“${term.excerpt}”`;
+          const explanation = document.createElement("p");
+          explanation.textContent = term.explanation;
+          item.append(label, excerpt, explanation);
+          potentiallyUndefinedTerms.append(item);
+        }
+        termValidationWarning.textContent = data.term_validation_warning || "";
+        termValidationWarning.hidden = !data.term_validation_warning;
+        noUndefinedTermCandidates.hidden = data.candidate_term_uses.length > 0;
+        noUndefinedTerms.hidden = Boolean(data.term_validation_warning) ||
+          data.candidate_term_uses.length === 0 || data.potentially_undefined_terms.length > 0;
         results.hidden = false;
         status.textContent = "Document processing complete.";
       } catch (failure) {

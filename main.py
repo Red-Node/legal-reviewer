@@ -5,7 +5,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from detection import detect_sections_and_references, validate_references
-from terms import detect_terms
+from terms import detect_terms, validate_terms
 
 app = FastAPI(title="Legal Reviewer")
 BASE_DIR = Path(__file__).resolve().parent
@@ -60,6 +60,12 @@ def analyze_document(file: UploadFile | None = File(default=None)):
         # Detect all pages first, so a reference can point to a later section.
         validation = validate_references(detections["sections"], detections["references"])
         term_detections = detect_terms(pages)
+        term_validation = validate_terms(
+            term_detections["defined_terms"],
+            term_detections["candidate_term_uses"],
+            detections["sections"],
+            detections["references"],
+        )
         return {
             "filename": filename,
             "total_pages": len(pages),
@@ -67,6 +73,7 @@ def analyze_document(file: UploadFile | None = File(default=None)):
             **detections,
             **validation,
             **term_detections,
+            **term_validation,
         }
     finally:
         file.file.close()
