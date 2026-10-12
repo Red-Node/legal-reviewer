@@ -36,6 +36,8 @@ of questions for counsel without any AI call or automatic email sending.
 - `test_deployment.py`: checks public demo blocking, health, deployment configuration, and upload protections offline.
 - `benchmark/`: contains the fictional benchmark PDF, separate answer key, editable source, offline builder/validator, integrity tests, and baseline evaluator.
 - `benchmark/results/`: stores offline JSON and Markdown evaluation reports; these are not served by the app.
+- `benchmark/run_real_ai.py`: local, exactly-confirmed, one-request synthetic Claude runner with a no-network dry-run mode.
+- `benchmark/test_run_real_ai.py`: offline runner tests using fake credentials, mocked streaming responses, and blocked networking.
 
 ## Run locally on macOS
 
@@ -1279,6 +1281,176 @@ not a deduplicated issue-type precision score. The inherited answer-key scope an
 human ambiguity judgments remain limitations. No legal correctness, all-20
 coverage, or paid AI performance claim is made.
 
+## Safe one-request Claude benchmark runner (Milestone 8B-2A)
+
+**Preparation only: no real request was made in this milestone.** The isolated
+local runner can make at most one explicitly confirmed Messages API request per
+invocation. It does not run at import, startup, upload, or during the rule-based
+evaluation. It has no public endpoint and does not change production defaults,
+detectors, model settings, prompts, benchmark ground truth, or Railway settings.
+
+The runner reads only the fixed six-page
+`benchmark/fictional_services_agreement.pdf`. It uses the actual production upload
+analysis function to extract pages, the original production page formatter and
+system prompt, and the existing parser and independent quote verifier. It never
+reads `answer_key.json` or `contract_source.json`; no expected findings, issue
+counts, answer descriptions, or reference quotes are supplied to the model.
+There is no automatic grading in this preparation milestone.
+
+### Configuration and limits
+
+| Setting | Local benchmark runner | Production web default (unchanged) |
+| --- | ---: | ---: |
+| Maximum document input, with page markers | 25,000 UTF-8 bytes | 20,000 UTF-8 bytes |
+| Maximum output | 8,192 tokens | 2,048 tokens |
+| SDK timeout | 120 seconds | 30 seconds |
+| Automatic retries | 0 | 0 |
+
+The complete current benchmark input is **21,641 bytes**. It is never truncated.
+The runner is restricted to `claude-sonnet-5-5` so its displayed estimate has a
+known pricing basis. The API key is read exclusively from the local process
+configuration, using the existing read-only `.env` loader; existing environment
+variables take precedence. Nothing rewrites `.env`. Keys are never printed,
+passed as command arguments, or stored in result files.
+
+`PUBLIC_DEMO_ONLY=true` blocks the runner, including malformed public-mode values.
+Railway project/environment/service/deployment markers also block it, even when
+the public-mode flag is false. The public-mode check runs again immediately before
+the SDK request. The independent CLI confirmation allows this isolated benchmark
+without turning on the web feature: **keep `ENABLE_REAL_AI=false`**. The existing
+web flag, local-only endpoint restrictions, and public-deployment guards remain
+unchanged. The runner is not connected to the web application.
+
+Before confirmation, the runner displays the filename, measured input bytes,
+model, output cap, timeout, zero retries, and an **estimated US$0.03-US$0.12 cost
+for one request**. This is an estimate, not a billing guarantee. It assumes
+standard [Sonnet 5.5 pricing](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)
+and approximately 6,000-9,000 input tokens with 2,000-8,192 billed output tokens.
+Adaptive thinking may share the output budget; fewer returned findings may cost
+less. It does not force the model to produce a particular number of findings.
+The dry-run cannot check key validity, account/model access, or credit balance
+without contacting Anthropic, and explicitly says so.
+
+### Safe dry-run — run this first
+
+From the repository root, activate the existing environment:
+
+```sh
+source .venv/bin/activate
+python -m benchmark.run_real_ai --dry-run
+```
+
+This checks configuration, the public/hosting guards, full PDF extraction, byte
+limits, and local storage writability. It never constructs an API client or
+contacts Anthropic, does not ask for paid confirmation, and does not create a run
+or result files. A temporary storage probe is removed immediately. If the key is
+missing or still a placeholder, it stops with a non-sensitive error. Configure
+credentials privately before any future authorized request; do not paste them
+into command arguments, chat, the browser, or Git.
+
+The actual local dry-run in this milestone passed with the full 21,641-byte input,
+model `claude-sonnet-5-5`, output cap 8,192, timeout 120 seconds, and zero retries.
+
+### Future paid invocation — NOT executed in this milestone
+
+Only after you explicitly approve a paid test, use a normal local interactive
+Terminal and run:
+
+```sh
+python -m benchmark.run_real_ai
+```
+
+Review the displayed settings and estimated cost. To authorize exactly this
+invocation, type:
+
+```text
+RUN ONE PAID REQUEST
+```
+
+Any other input, including different capitalization or surrounding spaces,
+cancels without a request. EOF or Control-C at confirmation cancels. Piped input
+and non-interactive execution are refused. There is no `--yes`, automatic
+confirmation, or automatic retry. A second invocation is a separate potential
+charge and requires the same confirmation again.
+
+The SDK is pinned to the official `https://api.anthropic.com` endpoint, with
+zero retries and HTTP redirects disabled. The request uses streaming so model
+text received before a timeout or interruption can be retained. No token-counting,
+model-listing, or other API calls are made. Production's capped send helper is
+not changed; the SDK call is isolated in the CLI because the production helper
+cannot send more than 2,048 output tokens.
+
+### Inspect results locally
+
+A confirmed run reserves a unique timestamp/UUID directory beneath:
+
+```text
+benchmark/results/real_ai_runs/<run-id>/
+```
+
+Directories are owner-only (`0700`) and files owner-readable/writable (`0600`).
+Every JSON file is created exclusively; existing files are never overwritten.
+Results are kept in the following separate files:
+
+- `preflight.json`: settings, cost estimate, start timestamp, and fingerprints of
+  the PDF, complete document message, and system prompt. It contains no key or
+  complete input-document text.
+- `raw.json`: raw model text, requested and returned model IDs, reported usage,
+  stop reason, start/end timestamps, stream-completion state, SDK request-attempt
+  count (zero or one), and safe API error details. It is saved **before parsing**,
+  including incomplete, invalid, refused, or timed-out results.
+- `parsed.json`: findings accepted by the existing JSON parser; still unverified.
+- `verified.json`: findings after independent page/quote verification, preserving
+  failed quotes and their reasons. Verified evidence does not establish legal
+  correctness or human approval.
+- `processing_error.json`, when needed: safe parsing, verification, or storage
+  failure information. The immutable raw result is not overwritten to add these
+  later errors.
+
+`raw_text` joins model text blocks in the same way as the production helper.
+Thinking content and signatures, authentication headers, HTTP request objects,
+and provider error bodies are not saved. Reported usage may include thinking
+cost and can be incomplete after a failed stream. The configured key and
+credential-looking strings are redacted if a provider unexpectedly echoes them.
+SDK/transport debug logging is suppressed for the request, then restored.
+
+The entire `benchmark/results/real_ai_runs/` directory is excluded by `.gitignore`;
+the existing offline baseline reports remain tracked separately. Never force-add
+or deploy these captures without explicit review. There are no public app routes
+or UI links for them. An intentional reviewed export should include only the
+selected safe files, not credentials, headers, or local environment files.
+
+Exit code `0` means dry-run validation or response processing succeeded; it does
+not mean all quotes verified or all planted issues were found. Code `1` means
+cancellation, `2` means a failed check/request/processing step, and `130` means an
+interrupted request whose available partial result was saved.
+
+### Offline tests and remaining risks
+
+```sh
+python -m unittest benchmark.test_run_real_ai -v
+python -m unittest -v
+```
+
+All **282 offline tests pass**, including **36 new runner tests**. These use fake
+keys, mocked streams/transports, and blocked socket connections. They cover the
+exact confirmation, dry-run isolation, public/Railway blocking, complete input
+and UTF-8 boundaries, no ground-truth reads, a single SDK request, zero retries
+and redirects, raw-before-parse ordering, partial timeout/interruption capture,
+malformed/truncated responses, secret redaction, exclusive files and private
+permissions, storage failures, logging restoration, unchanged production defaults,
+and ignored local captures. Tests never contact Anthropic.
+
+A timeout or interruption can still incur charges. The SDK timeout is not a
+strict overall wall-clock deadline for a continuously streaming response. A
+force-killed process or disk failure can prevent saving available results despite
+preflight storage checks; no automatic retry is attempted. Check local files and
+account usage before authorizing another invocation. API credentials/access and
+the actual live streaming behavior remain untested because this milestone makes
+no paid request. Review the fixed PDF to confirm it remains entirely fictional
+before authorizing its transfer. The model can still miss issues, invent quotes,
+or return incomplete JSON despite the larger budget.
+
 ## Limits and document handling
 
 - The size limit is 10 × 1024 × 1024 bytes and is checked in both the browser and server.
@@ -1322,3 +1494,71 @@ Real Claude integration is disabled by default. The application uses determinist
 rules and a local mock AI demo. Only a future explicitly enabled and confirmed
 real request would send document text to Anthropic. There is no document editing
 or database storage.
+
+
+## Grade the saved Claude benchmark (Milestone 8B-2C)
+
+This evaluator works entirely offline. **Do not run the paid request runner again
+for grading.** It reads the existing local raw, parsed, and verified capture for
+run `20261012T073514543612Z_d5175dad358f430084ec7de3cb29d8b7`, parses the raw text
+again, and independently re-verifies quotations against production-extracted PDF
+text. It checks fingerprints and compares the results with the saved artifacts.
+The originals are never written to or overwritten. No API client is constructed.
+
+From the repository root, with the virtual environment active:
+
+```bash
+python -m benchmark.grade_real_ai
+```
+
+Reports for this run already exist under `benchmark/results/`. To reproduce them
+without overwriting anything, choose a new local output directory:
+
+```bash
+python -m benchmark.grade_real_ai --output-dir /tmp/legal-reviewer-grading-check
+```
+
+An existing report causes the command to stop rather than overwrite it. The
+JSON and Markdown filenames begin with `ai_evaluation_` and
+`combined_evaluation_`, followed by the run ID. Default generated evaluation
+reports are ignored by Git and have no public UI or endpoint. Do not copy them
+into public assets. A custom output directory remains your responsibility.
+
+`benchmark/ai_assessments.json` records the coding assistant's explicit semantic
+assessment for every prediction, with reasons and input fingerprints. Matching
+is not based on category alone or on keyword similarity. Credit requires the
+same issue identity, the same category, complete expected provision quotations
+on the correct pages/sections, and independently verified evidence for the entire
+finding. Only one prediction can receive credit for each planted issue. This is
+an inspectable semantic assessment, not an independent human adjudication; a
+reviewer can challenge its reasoning. Uncertain assessments are explicitly
+marked for human adjudication and receive no automatic credit. Their provisional
+FP/FN counts remain visible until adjudicated. Changed captures or answer keys
+require fresh assessment, not reuse of this run's mapping.
+
+For this saved run, the AI-only result is 8 TP, 2 FP, 1 FN (80% precision,
+88.89% recall). All 10 findings and 24 source quotations were verified. The
+missed issue is AM03 (reasonable transition expenses). F6 groups undefined terms
+and F7 groups missing section references under ambiguity; these observations
+overlap rule-based ground truth, but cannot earn additional ambiguity credit.
+They count as one unmatched prediction each, not as false quotations or
+necessarily false substantive observations. No uncertain matches remain in this
+assessment.
+
+The combined summary uses the **saved** rule-based baseline, without rerunning
+or improving its grading: 19 TP, 8 FP, 1 FN across 20 planted issues (70.37%
+precision, 95% recall). It keeps the components separate and does not merge or
+recategorize duplicate observations across categories. These are results for one
+clean fictional agreement and one Claude run, not universal accuracy. Strict
+full-quote matching may under-credit other valid shorter evidence.
+
+Run the grading tests or the complete offline suite:
+
+```bash
+python -m unittest benchmark.test_grade_real_ai -v
+python -m unittest -v
+```
+
+Tests use synthetic grading cases and block AI/network calls. Tests that inspect
+the actual capture skip when it is absent in a fresh clone, because paid capture
+files intentionally remain local. No account credentials are needed for grading.

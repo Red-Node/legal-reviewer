@@ -220,3 +220,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local paid benchmark captures; review explicitly before any intentional export.
+benchmark/results/real_ai_runs/
+
+# Local evaluation reports derived from paid benchmark captures.
+benchmark/results/ai_evaluation_*
+benchmark/results/combined_evaluation_*

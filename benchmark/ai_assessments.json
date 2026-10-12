@@ -1,0 +1,73 @@
+{
+  "run_id": "20261012T073514543612Z_d5175dad358f430084ec7de3cb29d8b7",
+  "source_sha256": {
+    "preflight": "63f690b5ba03d4f86a2a324aaa17be5280e5f502a80e49e6f021945fb226ad3a",
+    "raw": "416451531941db14d9b7d3badc44e79c0f3d83e3f18e14891a6a4bb78586b3d3",
+    "parsed": "a0563d3f6d2417ca31a0354c78ff77165a868664389ff58954e7c3c2847e7893",
+    "verified": "6ac11837e2a14093d68edbc990ff892cd0529e2f90bebdb11332ef90cdd7435b"
+  },
+  "answer_key_sha256": "fdd0519c93aa60a7dd0547bc91b99049fde22d4c9ed9dea96a605b3cfc6d5206",
+  "reviewer": "Coding assistant: explicit semantic assessment, not independent human adjudication or legal advice. No model calls used for grading.",
+  "assessments": [
+    {
+      "prediction_id": "F1",
+      "issue_id": "CT01",
+      "disposition": "match",
+      "reason": "Both invoice deadlines (Sections 2.1 and 6.2) concern the same undisputed monthly invoice and receipt event; explanation identifies 10 versus 30 calendar days, with both complete source clauses quoted."
+    },
+    {
+      "prediction_id": "F2",
+      "issue_id": "CT02",
+      "disposition": "match",
+      "reason": "Exclusive USD versus EUR payment for the same monthly service fee in Sections 2.3 and 6.3; explanation identifies the currency conflict and quotes both complete obligations."
+    },
+    {
+      "prediction_id": "F3",
+      "issue_id": "CT05",
+      "disposition": "match",
+      "reason": "Exactly 60 versus exactly 15 calendar days for Customer termination without cause in Sections 5.1 and 6.4; same actor and trigger, both clauses quoted."
+    },
+    {
+      "prediction_id": "F4",
+      "issue_id": "CT03",
+      "disposition": "match",
+      "reason": "Deletion at day 30 versus retention until day 90 for every Customer record in Sections 3.1 and 5.5; explanation identifies the incompatible retention duties and quotes both clauses."
+    },
+    {
+      "prediction_id": "F5",
+      "issue_id": "CT04",
+      "disposition": "match",
+      "reason": "Blanket subcontracting ban versus mandatory delegation of the ticket queue in Sections 4.1 and 4.2; explanation identifies the same service within the ban and quotes both clauses."
+    },
+    {
+      "prediction_id": "F6",
+      "issue_id": null,
+      "disposition": "unmatched",
+      "reason": "This groups UT01–UT05: absent definitions of Delivery Window, Payment Reserve, Security Baseline, Service Credit and Exit Package (Sections 1.4, 2.5, 3.3, 4.3, 5.3). The answer key expressly grades these omissions as undefined terms, not additional ambiguities. No evidence supports AM01–AM04. Count as one unmatched AI ambiguity prediction, not five extra true positives; source text itself is genuine."
+    },
+    {
+      "prediction_id": "F7",
+      "issue_id": null,
+      "disposition": "unmatched",
+      "reason": "This groups BR01–BR06: missing Sections 12.8, 13.6, 14.2, 15.4, 16.9 and 17.3 (source Sections 1.6 through 6.6). The key expressly reserves these for broken references, not additional ambiguities. No evidence supports AM01–AM04. Count as one unmatched AI ambiguity prediction; source text itself is genuine."
+    },
+    {
+      "prediction_id": "F8",
+      "issue_id": "AM02",
+      "disposition": "match",
+      "reason": "The explanation identifies the missing measurable priority response timeframe in Section 3.4, not the outage definition; its complete promptly obligation matches the planted issue."
+    },
+    {
+      "prediction_id": "F9",
+      "issue_id": "AM01",
+      "disposition": "match",
+      "reason": "The explanation identifies absent objective commercial-satisfaction acceptance criteria in Section 1.5, supported by the complete rejection-standard clause."
+    },
+    {
+      "prediction_id": "F10",
+      "issue_id": "AM04",
+      "disposition": "match",
+      "reason": "The explanation identifies undefined operating conditions and material-change threshold for suspension in Section 5.4, supported by the complete suspension-trigger clause."
+    }
+  ]
+}
