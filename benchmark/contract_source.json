@@ -1,0 +1,663 @@
+{
+  "name": "fictional-commercial-services-v1",
+  "pages": [
+    {
+      "subtitle": "Parties, definitions and scope",
+      "sections": [
+        {
+          "number": "1.1",
+          "title": "Parties",
+          "paragraphs": [
+            "This agreement is made between Velnora Labs and Quorvia Works, two entirely fictional companies incorporated in the fictional jurisdiction of Bellmere. The Supplier provides administrative workflow software and associated support to the Customer for a fictional inventory-planning project. No real business, individual, or confidential transaction is represented.",
+            "The Customer shall appoint one account administrator through the shared ticket queue. The Supplier shall provide a separate account for that administrator. Each party bears the cost of its own personnel except for expenses expressly payable under this agreement."
+          ]
+        },
+        {
+          "number": "1.2",
+          "title": "Term",
+          "paragraphs": [
+            "The agreement begins on the Effective Date and continues until 31 October 2032, unless terminated earlier under its termination provisions. It does not renew automatically. A further term requires a signed written amendment stating its beginning and ending dates.",
+            "The Supplier shall open the shared ticket queue on the Effective Date. The Customer shall submit its initial list of ten authorized users within five calendar days after that date. A change to the user list shall be recorded in the same queue."
+          ]
+        },
+        {
+          "number": "1.3",
+          "title": "Definitions",
+          "paragraphs": [
+            "\"Velnora Labs\" means the fictional company identified as the service provider in Section 1.1. \"Quorvia Works\" means the fictional company identified as the service recipient in Section 1.1.",
+            "\"Supplier\" means Velnora Labs. \"Customer\" means Quorvia Works. \"Business Day\" means any Monday through Friday; no holiday exceptions apply.",
+            "\"Effective Date\" means 1 November 2031. \"Acceptance Record\" shall mean a dated entry in the shared ticket queue recording the Customer's acceptance or rejection of a deliverable.",
+            "\"Records\" means all inventory input files and monthly inventory summaries, including their exports, copies, and backups. A Customer record is any item within Records. Billing, notice, and access-register entries are not Records. All times in this agreement use the fixed clock offset UTC+00:00."
+          ]
+        },
+        {
+          "number": "1.4",
+          "title": "Services",
+          "paragraphs": [
+            "The Supplier shall operate the workflow software for ten named users, maintain the shared ticket queue, and produce one inventory summary each calendar month. The summary shall list the item identifier, quantity, and location supplied by the Customer. It shall not include personal data.",
+            "The Supplier shall include the Delivery Window in each monthly service schedule. The schedule shall be sent through the shared ticket queue on the first Business Day of the month. The Customer shall provide inventory inputs in comma-separated text files."
+          ]
+        },
+        {
+          "number": "1.5",
+          "title": "Acceptance",
+          "paragraphs": [
+            "The Customer may reject a deliverable if it is not commercially satisfactory. The Customer shall record acceptance or rejection in an Acceptance Record within five calendar days after delivery. Silence does not constitute acceptance.",
+            "Following a recorded rejection, the Supplier shall submit a revised deliverable within ten calendar days. The revised deliverable is reviewed through the same process. Rejection does not itself change the payment provisions, terminate the agreement, or expand the list of services."
+          ]
+        },
+        {
+          "number": "1.6",
+          "title": "Routing",
+          "paragraphs": [
+            "The Supplier shall use the escalation route stated in Section 12.8 for a disputed Acceptance Record. Until a dispute is resolved, the shared ticket queue shall retain the original entry and any replacement entry as separate records.",
+            "The parties shall identify each deliverable by its month and a sequential identifier. Each correction shall retain that identifier and add a revision number. This labeling requirement does not resolve a dispute or constitute acceptance of the disputed deliverable."
+          ]
+        }
+      ]
+    },
+    {
+      "subtitle": "Charges, invoicing and reconciliation",
+      "sections": [
+        {
+          "number": "2.1",
+          "title": "Payment",
+          "paragraphs": [
+            "The due date for every undisputed monthly invoice is 10 calendar days after receipt. Receipt occurs when the invoice is entered in the shared ticket queue and both parties receive its entry identifier. An invoice is undisputed except for amounts disputed through the process in Section 2.2.",
+            "The Customer shall pay by bank transfer to the account stated on the invoice. The Supplier shall confirm the amount received in the shared ticket queue within two Business Days of transfer. A bank reference shall identify the invoice number."
+          ]
+        },
+        {
+          "number": "2.2",
+          "title": "Invoices",
+          "paragraphs": [
+            "The Supplier shall issue one monthly invoice on the last Business Day of each month. Each invoice shall identify the service month, user count, monthly fee, separately payable expenses, and any applicable taxes. The invoice shall contain a unique sequential number.",
+            "The Customer shall identify any disputed invoice line in the shared ticket queue within five calendar days after receipt and state the amount and reason disputed. The undisputed balance remains payable. A corrected invoice shall retain the original number and add a revision number."
+          ]
+        },
+        {
+          "number": "2.3",
+          "title": "Currency",
+          "paragraphs": [
+            "The monthly service fee is USD 2400 and shall be paid exclusively in USD. The fee covers the software access, monthly inventory summary, and ticket-queue operation described in Section 1.4. It excludes taxes and separately payable transition expenses.",
+            "The fee is fixed throughout the initial term. Increasing or reducing the authorized user count does not change it unless the parties sign a written amendment stating the new count and fee. No increase arises solely from a software version update."
+          ]
+        },
+        {
+          "number": "2.4",
+          "title": "Taxes",
+          "paragraphs": [
+            "Any tax legally chargeable on the services shall be stated as a separate invoice line showing its basis and amount. Each party is responsible for taxes on its own income. The Supplier shall provide the Customer with a copy of any tax document issued for an invoice.",
+            "The Customer may withhold an amount only where the governing law requires withholding. It shall provide the corresponding withholding record within five Business Days after payment. This provision does not create a discount, change the stated currency, or permit withholding an undisputed fee for another reason."
+          ]
+        },
+        {
+          "number": "2.5",
+          "title": "Reconciliation",
+          "paragraphs": [
+            "The Customer shall record the Payment Reserve in its monthly reconciliation entry. The entry shall separately list the invoice number, amount paid, transfer date, and any disputed amount. Recording that entry does not amend the invoice or excuse a payment obligation.",
+            "The Supplier shall compare the listed transfers with its bank receipts once each month and record any unmatched reference. A correction shall identify the original entry and the corrected value. Neither party may erase the original invoice or reconciliation entry."
+          ]
+        },
+        {
+          "number": "2.6",
+          "title": "Classification",
+          "paragraphs": [
+            "The invoice classification code shall be assigned under Section 13.6. The code shall appear beside the invoice number in the shared ticket queue. Its presence or absence does not change the Customer's obligation to pay an undisputed amount.",
+            "The Supplier shall keep invoice data separate from the Customer's inventory input files. The parties shall use the invoice number for billing correspondence and the deliverable identifier for acceptance correspondence, so that a billing query does not overwrite an acceptance entry."
+          ]
+        }
+      ]
+    },
+    {
+      "subtitle": "Records, access and support",
+      "sections": [
+        {
+          "number": "3.1",
+          "title": "Deletion",
+          "paragraphs": [
+            "The Supplier shall permanently delete every Customer record 30 calendar days after termination. This obligation covers active files, exports, copies, and backups. The Supplier shall record the deletion date, method, and number of deleted items without retaining their content.",
+            "The deletion confirmation shall be delivered through the shared ticket queue. The Customer shall download it before the queue closes. A confirmation may retain invoice identifiers and aggregate counts, but shall not contain inventory input values or copies of the deleted files."
+          ]
+        },
+        {
+          "number": "3.2",
+          "title": "Access",
+          "paragraphs": [
+            "The Supplier shall assign a separate login to each authorized user and require a password and a second authentication factor. Access rights shall be limited to the project workspace. The Customer shall identify the users permitted to upload, view, or export inventory files.",
+            "The Customer shall notify the Supplier through the shared ticket queue when a user leaves the project. The Supplier shall disable that login within one Business Day after receipt. Disabling a login does not itself delete inventory files or alter the record-retention provisions."
+          ]
+        },
+        {
+          "number": "3.3",
+          "title": "Controls",
+          "paragraphs": [
+            "The Supplier shall record the Security Baseline in the access register before enabling a user account. The register shall state the account identifier, date enabled, and permitted workspace. It shall not contain the user's password or authentication recovery code.",
+            "The Supplier shall encrypt inventory files while stored and while transmitted. It shall test recovery from one backup on the first Business Day of each month and record whether the recovered file matches the backed-up file. A failed test shall be entered in the shared ticket queue."
+          ]
+        },
+        {
+          "number": "3.4",
+          "title": "Priority",
+          "paragraphs": [
+            "The Supplier shall respond to priority support requests promptly. A priority request is a ticket reporting that all authorized users are unable to access the workspace. The Customer shall identify the affected workspace and the time at which access failed.",
+            "The Supplier shall maintain one ticket for each reported outage and record each restoration attempt in that ticket. It shall not close the ticket until the Customer confirms that at least one authorized user can access the workspace. Closure is not a waiver of any recorded query."
+          ]
+        },
+        {
+          "number": "3.5",
+          "title": "Handling",
+          "paragraphs": [
+            "The Supplier shall use Customer records only to provide the services. It shall not sell the records, use them for advertising, or add them to a shared demonstration environment. Personnel access shall be limited to the authorized project tasks recorded in the shared ticket queue.",
+            "The Customer shall upload inventory identifiers and quantities only. It shall not upload employee names, contact details, payment credentials, or other personal information. If such information is uploaded, the Customer shall identify the affected file and instruct the Supplier to remove it within one Business Day."
+          ]
+        },
+        {
+          "number": "3.6",
+          "title": "Audit",
+          "paragraphs": [
+            "The access-register review shall follow the procedure in Section 14.2. The review entry shall identify the register version and the reviewer's role, without naming any individual. It shall be stored separately from the inventory input files.",
+            "The Customer may request a copy of the current access register once in each calendar quarter. The Supplier shall provide that copy within five Business Days. The copy shall omit authentication secrets and include the account identifiers and permitted workspaces described in Section 3.3."
+          ]
+        }
+      ]
+    },
+    {
+      "subtitle": "Personnel, performance and ownership",
+      "sections": [
+        {
+          "number": "4.1",
+          "title": "Delegation",
+          "paragraphs": [
+            "The Supplier shall not delegate any part of the services to a subcontractor. All software operation, ticket handling, and inventory-summary preparation shall be performed by the Supplier's own personnel. The Customer may request a written confirmation of compliance once each calendar quarter.",
+            "The Supplier shall ensure that its personnel receive the access restrictions stated in this agreement before receiving a project login. The Supplier remains responsible for their acts in the project workspace. Training shall use fictional inventory records rather than the Customer's production inputs."
+          ]
+        },
+        {
+          "number": "4.2",
+          "title": "Queue Operation",
+          "paragraphs": [
+            "The Supplier shall delegate operation of the shared ticket queue to a subcontractor throughout the term. The subcontractor shall process the queue using the Supplier's procedures and project access restrictions. The Supplier shall provide a monthly record of queue activity to the Customer.",
+            "The activity record shall show ticket identifiers, opening dates, closure dates, and workspace identifiers. It shall omit personnel names and authentication secrets. Supplying the record does not transfer responsibility for service performance to the Customer or grant the subcontractor ownership of Customer records."
+          ]
+        },
+        {
+          "number": "4.3",
+          "title": "Performance",
+          "paragraphs": [
+            "The Supplier shall show the Service Credit as a separate item in the monthly performance report. The report shall also list the number of support tickets opened and closed during the month. It shall be delivered through the shared ticket queue with the inventory summary.",
+            "The parties shall correct a numerical reporting error by posting a revised report with the original month and a revision number. Reporting an error does not alter a ticket's original opening or closure date. The original report shall remain available beside the revised report."
+          ]
+        },
+        {
+          "number": "4.4",
+          "title": "Expenses",
+          "paragraphs": [
+            "The Customer shall reimburse reasonable transition expenses. The Supplier shall identify each claimed expense as a separate line on the next monthly invoice and attach the corresponding receipt. The line shall identify the date of the expenditure and the transition task to which it relates.",
+            "A reimbursed expense is separate from the fixed monthly service fee. A disputed expense follows the invoice-dispute process in Section 2.2. An expense shall not be added to the monthly fee or carried into a later service term as a permanent price increase."
+          ]
+        },
+        {
+          "number": "4.5",
+          "title": "Ownership",
+          "paragraphs": [
+            "The Customer owns its inventory input files and the monthly summaries prepared solely from those inputs. The Supplier owns the workflow software and tools that existed before the Effective Date. The Customer receives a license to use that software for the term and the ten authorized users only.",
+            "The Supplier shall not transfer ownership of Customer records to any third party. The Customer shall not distribute the Supplier's software outside the project workspace. On termination, the software license ends, but the Customer may continue to use downloaded inventory summaries that it owns."
+          ]
+        },
+        {
+          "number": "4.6",
+          "title": "Changes",
+          "paragraphs": [
+            "The change-request review sequence is set out in Section 15.4. Every proposed change shall state the affected service, proposed effective date, and any proposed fee adjustment. Posting a proposed change does not authorize implementation.",
+            "A change becomes operative only through a written amendment signed by both parties. The Supplier shall preserve the original service description and the signed amendment in separate queue entries. Each amendment shall state which numbered clauses it changes; silence on a clause leaves that clause in place."
+          ]
+        }
+      ]
+    },
+    {
+      "subtitle": "Termination, suspension and exit",
+      "sections": [
+        {
+          "number": "5.1",
+          "title": "Notice",
+          "paragraphs": [
+            "For termination by the Customer without cause, the required notice period is exactly 60 calendar days. The notice shall state the intended termination date and identify this agreement. It shall be delivered through the notice process in Section 6.1.",
+            "Termination without cause does not cancel fees for services already provided or remove the obligation to deliver an inventory summary for a completed service month. The Supplier shall not charge a separate termination penalty. Record-handling and exit obligations continue for their stated periods after termination."
+          ]
+        },
+        {
+          "number": "5.2",
+          "title": "Breach",
+          "paragraphs": [
+            "A party may terminate for breach if the other party fails to cure a specified contractual breach within twenty calendar days after receiving written notice. The notice shall identify the breached clause, the observed conduct, and the action requested to cure it.",
+            "Termination for breach takes effect when a second written notice states that the cure period has expired without cure. This process is separate from termination without cause. A payment dispute recorded under the invoice-dispute process is not by itself proof that a breach occurred."
+          ]
+        },
+        {
+          "number": "5.3",
+          "title": "Transfer",
+          "paragraphs": [
+            "The Supplier shall deliver the Exit Package to the Customer within 7 calendar days after termination. Delivery shall be made through an export entry in the shared ticket queue. The entry shall show the date, file count, and checksum for each transferred file.",
+            "The Customer shall confirm receipt within two Business Days after the export entry is posted. A failed download shall be recorded as a new ticket identifying the export entry. A receipt confirmation acknowledges transfer only and does not release either party from a continuing contractual obligation."
+          ]
+        },
+        {
+          "number": "5.4",
+          "title": "Suspension",
+          "paragraphs": [
+            "The Supplier may suspend the services if operating conditions change materially. It shall record a suspension notice in the shared ticket queue at least one Business Day before suspension. The notice shall identify the affected services and the suspension start date.",
+            "Each suspension under this clause shall last no longer than five Business Days. The Supplier shall then restore access and record the restoration date. A suspension does not terminate the agreement, extend the initial term, or change the fixed monthly fee."
+          ]
+        },
+        {
+          "number": "5.5",
+          "title": "Retention",
+          "paragraphs": [
+            "The Supplier shall retain every Customer record until 90 calendar days after termination before deleting it. This requirement applies to active files, exports, copies, and backups. The Supplier shall maintain the existing access restrictions during the retention period.",
+            "The Customer may request one copy of its inventory inputs and completed summaries during that period. The Supplier shall deliver the requested copy within five Business Days. Delivering a copy does not change the stated retention period or grant a continuing license to the Supplier's software."
+          ]
+        },
+        {
+          "number": "5.6",
+          "title": "Disputes",
+          "paragraphs": [
+            "The termination-dispute referral process is specified in Section 16.9. A dispute entry shall identify the notice being disputed and the clause relied on by each party. Creating the entry does not amend the notice or establish that either party is correct.",
+            "The parties shall preserve the original notice, any response, and the associated ticket identifiers as separate entries. They shall not replace a termination date merely by editing an existing ticket. A change to an agreed date requires a signed written amendment."
+          ]
+        }
+      ]
+    },
+    {
+      "subtitle": "Communications and final provisions",
+      "sections": [
+        {
+          "number": "6.1",
+          "title": "Communications",
+          "paragraphs": [
+            "Formal notices shall be posted to the shared ticket queue using the recipient identifiers supplier-legal and customer-legal. Receipt occurs at the timestamp assigned when the queue accepts the entry. The party sending a notice shall retain the assigned entry identifier.",
+            "A notice entered after 17:00 is deemed received at 09:00 on the next Business Day. The fixed clock offset stated in the definitions applies. The Supplier shall keep both notice channels available until one hundred calendar days after termination, without restoring any expired software license."
+          ]
+        },
+        {
+          "number": "6.2",
+          "title": "Billing Confirmation",
+          "paragraphs": [
+            "The due date for every undisputed monthly invoice is 30 calendar days after receipt. The receipt event is the shared ticket-queue entry specified in Section 2.1. The Customer shall use the same invoice number in its transfer reference.",
+            "The parties shall retain a copy of each billing confirmation in their own accounting records. Those copies shall contain invoice identifiers and amounts rather than inventory input values. An accounting copy does not grant a right to retain the Customer's inventory records for another purpose."
+          ]
+        },
+        {
+          "number": "6.3",
+          "title": "Settlement Currency",
+          "paragraphs": [
+            "The monthly service fee is EUR 2400 and shall be paid exclusively in EUR. This requirement covers the fixed fee for the software access, monthly inventory summary, and ticket-queue operation described in Section 1.4.",
+            "Payment shall be made to the account identified on the relevant invoice. Each transfer shall identify the service month and invoice number. A bank charge imposed on the sending party is borne by that party and does not reduce the invoiced service fee."
+          ]
+        },
+        {
+          "number": "6.4",
+          "title": "Termination Confirmation",
+          "paragraphs": [
+            "For termination by the Customer without cause, the required notice period is exactly 15 calendar days. The notice shall be sent through the formal notice channels and shall state the proposed termination date. It does not need to identify a contractual breach.",
+            "The Supplier shall record receipt of the notice using its entry identifier. An acknowledgment of receipt does not waive unpaid service fees, change a record-handling obligation, or constitute an amendment. A requested extension of the agreement requires a separately signed written amendment."
+          ]
+        },
+        {
+          "number": "6.5",
+          "title": "Entire Agreement",
+          "paragraphs": [
+            "This agreement and signed written amendments constitute the entire agreement for the described project. All numbered clauses are operative; no priority is given to a clause merely because it appears later in this agreement. A proposed amendment has no effect until signed by both parties.",
+            "The parties may sign an amendment electronically through their project accounts, using a separate approval entry from an ordinary support ticket. Each approval entry shall identify the amendment version and the party approving it. Neither a performance report nor an invoice constitutes a signed amendment."
+          ]
+        },
+        {
+          "number": "6.6",
+          "title": "Governing Framework",
+          "paragraphs": [
+            "The agreement is governed by the law of the fictional jurisdiction of Bellmere, and its fictional civil commercial court has exclusive venue. The document-service protocol for court correspondence is stated in Section 17.3.",
+            "Each party shall retain its own copy of this agreement and any signed amendments. The project uses fictional inventory records and fictional commercial amounts for this sample agreement. No individual names, authentic addresses, banking credentials, or actual confidential records form part of the project."
+          ]
+        }
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "id": "BR01",
+      "category": "broken_reference",
+      "description": "Missing reference target 12.8",
+      "sections": [
+        "1.6"
+      ],
+      "evidence": [
+        {
+          "section": "1.6",
+          "quote": "The Supplier shall use the escalation route stated in Section 12.8 for a disputed Acceptance Record."
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 12.8, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "12.8"
+    },
+    {
+      "id": "BR02",
+      "category": "broken_reference",
+      "description": "Missing reference target 13.6",
+      "sections": [
+        "2.6"
+      ],
+      "evidence": [
+        {
+          "section": "2.6",
+          "quote": "The invoice classification code shall be assigned under Section 13.6."
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 13.6, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "13.6"
+    },
+    {
+      "id": "BR03",
+      "category": "broken_reference",
+      "description": "Missing reference target 14.2",
+      "sections": [
+        "3.6"
+      ],
+      "evidence": [
+        {
+          "section": "3.6",
+          "quote": "The access-register review shall follow the procedure in Section 14.2."
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 14.2, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "14.2"
+    },
+    {
+      "id": "BR04",
+      "category": "broken_reference",
+      "description": "Missing reference target 15.4",
+      "sections": [
+        "4.6"
+      ],
+      "evidence": [
+        {
+          "section": "4.6",
+          "quote": "The change-request review sequence is set out in Section 15.4."
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 15.4, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "15.4"
+    },
+    {
+      "id": "BR05",
+      "category": "broken_reference",
+      "description": "Missing reference target 16.9",
+      "sections": [
+        "5.6"
+      ],
+      "evidence": [
+        {
+          "section": "5.6",
+          "quote": "The termination-dispute referral process is specified in Section 16.9."
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 16.9, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "16.9"
+    },
+    {
+      "id": "BR06",
+      "category": "broken_reference",
+      "description": "Missing reference target 17.3",
+      "sections": [
+        "6.6"
+      ],
+      "evidence": [
+        {
+          "section": "6.6",
+          "quote": "The document-service protocol for court correspondence is stated in Section 17.3."
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 17.3, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "17.3"
+    },
+    {
+      "id": "UT01",
+      "category": "undefined_term",
+      "description": "No explicit definition of Delivery Window",
+      "sections": [
+        "1.4"
+      ],
+      "evidence": [
+        {
+          "section": "1.4",
+          "quote": "The Supplier shall include the Delivery Window in each monthly service schedule."
+        }
+      ],
+      "explanation": "The capitalized multi-word term Delivery Window is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Delivery Window"
+    },
+    {
+      "id": "UT02",
+      "category": "undefined_term",
+      "description": "No explicit definition of Payment Reserve",
+      "sections": [
+        "2.5"
+      ],
+      "evidence": [
+        {
+          "section": "2.5",
+          "quote": "The Customer shall record the Payment Reserve in its monthly reconciliation entry."
+        }
+      ],
+      "explanation": "The capitalized multi-word term Payment Reserve is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Payment Reserve"
+    },
+    {
+      "id": "UT03",
+      "category": "undefined_term",
+      "description": "No explicit definition of Security Baseline",
+      "sections": [
+        "3.3"
+      ],
+      "evidence": [
+        {
+          "section": "3.3",
+          "quote": "The Supplier shall record the Security Baseline in the access register before enabling a user account."
+        }
+      ],
+      "explanation": "The capitalized multi-word term Security Baseline is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Security Baseline"
+    },
+    {
+      "id": "UT04",
+      "category": "undefined_term",
+      "description": "No explicit definition of Service Credit",
+      "sections": [
+        "4.3"
+      ],
+      "evidence": [
+        {
+          "section": "4.3",
+          "quote": "The Supplier shall show the Service Credit as a separate item in the monthly performance report."
+        }
+      ],
+      "explanation": "The capitalized multi-word term Service Credit is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Service Credit"
+    },
+    {
+      "id": "UT05",
+      "category": "undefined_term",
+      "description": "No explicit definition of Exit Package",
+      "sections": [
+        "5.3"
+      ],
+      "evidence": [
+        {
+          "section": "5.3",
+          "quote": "The Supplier shall deliver the Exit Package to the Customer within 7 calendar days after termination."
+        }
+      ],
+      "explanation": "The capitalized multi-word term Exit Package is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Exit Package"
+    },
+    {
+      "id": "CT01",
+      "category": "contradiction",
+      "description": "Conflicting invoice due dates",
+      "sections": [
+        "2.1",
+        "6.2"
+      ],
+      "evidence": [
+        {
+          "section": "2.1",
+          "quote": "The due date for every undisputed monthly invoice is 10 calendar days after receipt."
+        },
+        {
+          "section": "6.2",
+          "quote": "The due date for every undisputed monthly invoice is 30 calendar days after receipt."
+        }
+      ],
+      "explanation": "The same undisputed monthly invoice and same receipt event have incompatible due dates. The amounts are not alternative periods or minimum response times. Neither clause is conditional, and clause order gives no priority."
+    },
+    {
+      "id": "CT02",
+      "category": "contradiction",
+      "description": "Conflicting exclusive fee currencies",
+      "sections": [
+        "2.3",
+        "6.3"
+      ],
+      "evidence": [
+        {
+          "section": "2.3",
+          "quote": "The monthly service fee is USD 2400 and shall be paid exclusively in USD."
+        },
+        {
+          "section": "6.3",
+          "quote": "The monthly service fee is EUR 2400 and shall be paid exclusively in EUR."
+        }
+      ],
+      "explanation": "The identical monthly service fee must be paid exclusively in two different currencies. No currency option, conversion mechanism, or alternative service is offered. Count the resulting currency/denomination conflict as one issue."
+    },
+    {
+      "id": "CT03",
+      "category": "contradiction",
+      "description": "Deletion conflicts with mandatory retention",
+      "sections": [
+        "3.1",
+        "5.5"
+      ],
+      "evidence": [
+        {
+          "section": "3.1",
+          "quote": "The Supplier shall permanently delete every Customer record 30 calendar days after termination."
+        },
+        {
+          "section": "5.5",
+          "quote": "The Supplier shall retain every Customer record until 90 calendar days after termination before deleting it."
+        }
+      ],
+      "explanation": "Both clauses cover every Customer record, including backups. Permanent deletion at day 30 cannot coexist with retaining those records until day 90. The clauses do not concern different record classes."
+    },
+    {
+      "id": "CT04",
+      "category": "contradiction",
+      "description": "Subcontracting prohibited and required",
+      "sections": [
+        "4.1",
+        "4.2"
+      ],
+      "evidence": [
+        {
+          "section": "4.1",
+          "quote": "The Supplier shall not delegate any part of the services to a subcontractor."
+        },
+        {
+          "section": "4.2",
+          "quote": "The Supplier shall delegate operation of the shared ticket queue to a subcontractor throughout the term."
+        }
+      ],
+      "explanation": "Ticket-queue operation is expressly part of the services. A blanket ban on subcontracting conflicts with mandatory subcontracting of that same service. No exception or consent-based override is provided."
+    },
+    {
+      "id": "CT05",
+      "category": "contradiction",
+      "description": "Conflicting termination notice periods",
+      "sections": [
+        "5.1",
+        "6.4"
+      ],
+      "evidence": [
+        {
+          "section": "5.1",
+          "quote": "For termination by the Customer without cause, the required notice period is exactly 60 calendar days."
+        },
+        {
+          "section": "6.4",
+          "quote": "For termination by the Customer without cause, the required notice period is exactly 15 calendar days."
+        }
+      ],
+      "explanation": "The same party, termination type, and agreement have two mutually exclusive exact notice periods. Unlike competing minimum periods, both cannot be satisfied at once. Neither clause concerns termination for breach."
+    },
+    {
+      "id": "AM01",
+      "category": "ambiguity",
+      "description": "Subjective acceptance standard",
+      "sections": [
+        "1.5"
+      ],
+      "evidence": [
+        {
+          "section": "1.5",
+          "quote": "The Customer may reject a deliverable if it is not commercially satisfactory."
+        }
+      ],
+      "explanation": "Commercial satisfaction determines acceptance but has no stated benchmark, measurement, or decision criteria. Fixed inventory-summary fields do not establish this discretionary acceptance standard. Grade the uncertainty about this criterion as one issue."
+    },
+    {
+      "id": "AM02",
+      "category": "ambiguity",
+      "description": "Unspecified priority response timeframe",
+      "sections": [
+        "3.4"
+      ],
+      "evidence": [
+        {
+          "section": "3.4",
+          "quote": "The Supplier shall respond to priority support requests promptly."
+        }
+      ],
+      "explanation": "Priority requests have an objective outage definition, but promptly provides no measurable response timeframe. Other time limits govern different actions and do not supply a response deadline for priority tickets."
+    },
+    {
+      "id": "AM03",
+      "category": "ambiguity",
+      "description": "Unbounded reasonableness standard for expenses",
+      "sections": [
+        "4.4"
+      ],
+      "evidence": [
+        {
+          "section": "4.4",
+          "quote": "The Customer shall reimburse reasonable transition expenses."
+        }
+      ],
+      "explanation": "Receipts document spending, but no cap, rate, permitted cost classes, or approval criterion determines what counts as reasonable transition expenses. The concern is the reimbursement standard, not a conflict with the separate fixed monthly fee."
+    },
+    {
+      "id": "AM04",
+      "category": "ambiguity",
+      "description": "Undefined material-change threshold for suspension",
+      "sections": [
+        "5.4"
+      ],
+      "evidence": [
+        {
+          "section": "5.4",
+          "quote": "The Supplier may suspend the services if operating conditions change materially."
+        }
+      ],
+      "explanation": "Neither the relevant operating conditions nor a material-change threshold is specified. Notice timing and a five-day suspension cap do not define when the suspension right arises. Grade this trigger uncertainty as one issue."
+    }
+  ]
+}

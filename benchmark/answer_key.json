@@ -1,0 +1,376 @@
+{
+  "benchmark": "fictional-commercial-services-v1",
+  "version": 1,
+  "pdf_filename": "fictional_services_agreement.pdf",
+  "pdf_sha256": "99a9153c692284744f319030309565a37388175d93a4c9c1b319b2392d76ce4c",
+  "page_count": 6,
+  "category_totals": {
+    "broken_reference": 6,
+    "undefined_term": 5,
+    "contradiction": 5,
+    "ambiguity": 4
+  },
+  "issues": [
+    {
+      "id": "BR01",
+      "category": "broken_reference",
+      "description": "Missing reference target 12.8",
+      "sections": [
+        "1.6"
+      ],
+      "evidence": [
+        {
+          "section": "1.6",
+          "quote": "The Supplier shall use the escalation route stated in Section 12.8 for a disputed Acceptance Record.",
+          "page": 1
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 12.8, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "12.8"
+    },
+    {
+      "id": "BR02",
+      "category": "broken_reference",
+      "description": "Missing reference target 13.6",
+      "sections": [
+        "2.6"
+      ],
+      "evidence": [
+        {
+          "section": "2.6",
+          "quote": "The invoice classification code shall be assigned under Section 13.6.",
+          "page": 2
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 13.6, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "13.6"
+    },
+    {
+      "id": "BR03",
+      "category": "broken_reference",
+      "description": "Missing reference target 14.2",
+      "sections": [
+        "3.6"
+      ],
+      "evidence": [
+        {
+          "section": "3.6",
+          "quote": "The access-register review shall follow the procedure in Section 14.2.",
+          "page": 3
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 14.2, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "14.2"
+    },
+    {
+      "id": "BR04",
+      "category": "broken_reference",
+      "description": "Missing reference target 15.4",
+      "sections": [
+        "4.6"
+      ],
+      "evidence": [
+        {
+          "section": "4.6",
+          "quote": "The change-request review sequence is set out in Section 15.4.",
+          "page": 4
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 15.4, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "15.4"
+    },
+    {
+      "id": "BR05",
+      "category": "broken_reference",
+      "description": "Missing reference target 16.9",
+      "sections": [
+        "5.6"
+      ],
+      "evidence": [
+        {
+          "section": "5.6",
+          "quote": "The termination-dispute referral process is specified in Section 16.9.",
+          "page": 5
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 16.9, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "16.9"
+    },
+    {
+      "id": "BR06",
+      "category": "broken_reference",
+      "description": "Missing reference target 17.3",
+      "sections": [
+        "6.6"
+      ],
+      "evidence": [
+        {
+          "section": "6.6",
+          "quote": "The document-service protocol for court correspondence is stated in Section 17.3.",
+          "page": 6
+        }
+      ],
+      "explanation": "The clause expressly refers to Section 17.3, but no heading with that exact number exists. Grade this as one missing-target issue, not a separate substantive ambiguity about the omitted procedure.",
+      "target_section": "17.3"
+    },
+    {
+      "id": "UT01",
+      "category": "undefined_term",
+      "description": "No explicit definition of Delivery Window",
+      "sections": [
+        "1.4"
+      ],
+      "evidence": [
+        {
+          "section": "1.4",
+          "quote": "The Supplier shall include the Delivery Window in each monthly service schedule.",
+          "page": 1
+        }
+      ],
+      "explanation": "The capitalized multi-word term Delivery Window is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Delivery Window"
+    },
+    {
+      "id": "UT02",
+      "category": "undefined_term",
+      "description": "No explicit definition of Payment Reserve",
+      "sections": [
+        "2.5"
+      ],
+      "evidence": [
+        {
+          "section": "2.5",
+          "quote": "The Customer shall record the Payment Reserve in its monthly reconciliation entry.",
+          "page": 2
+        }
+      ],
+      "explanation": "The capitalized multi-word term Payment Reserve is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Payment Reserve"
+    },
+    {
+      "id": "UT03",
+      "category": "undefined_term",
+      "description": "No explicit definition of Security Baseline",
+      "sections": [
+        "3.3"
+      ],
+      "evidence": [
+        {
+          "section": "3.3",
+          "quote": "The Supplier shall record the Security Baseline in the access register before enabling a user account.",
+          "page": 3
+        }
+      ],
+      "explanation": "The capitalized multi-word term Security Baseline is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Security Baseline"
+    },
+    {
+      "id": "UT04",
+      "category": "undefined_term",
+      "description": "No explicit definition of Service Credit",
+      "sections": [
+        "4.3"
+      ],
+      "evidence": [
+        {
+          "section": "4.3",
+          "quote": "The Supplier shall show the Service Credit as a separate item in the monthly performance report.",
+          "page": 4
+        }
+      ],
+      "explanation": "The capitalized multi-word term Service Credit is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Service Credit"
+    },
+    {
+      "id": "UT05",
+      "category": "undefined_term",
+      "description": "No explicit definition of Exit Package",
+      "sections": [
+        "5.3"
+      ],
+      "evidence": [
+        {
+          "section": "5.3",
+          "quote": "The Supplier shall deliver the Exit Package to the Customer within 7 calendar days after termination.",
+          "page": 5
+        }
+      ],
+      "explanation": "The capitalized multi-word term Exit Package is used as an operative label, but has no exact explicit definition anywhere in the agreement. Grade the absent definition once; uncertainty caused by this same omission is not an additional ambiguity issue. This is a potential definition issue, not a conclusion about legal enforceability.",
+      "term": "Exit Package"
+    },
+    {
+      "id": "CT01",
+      "category": "contradiction",
+      "description": "Conflicting invoice due dates",
+      "sections": [
+        "2.1",
+        "6.2"
+      ],
+      "evidence": [
+        {
+          "section": "2.1",
+          "quote": "The due date for every undisputed monthly invoice is 10 calendar days after receipt.",
+          "page": 2
+        },
+        {
+          "section": "6.2",
+          "quote": "The due date for every undisputed monthly invoice is 30 calendar days after receipt.",
+          "page": 6
+        }
+      ],
+      "explanation": "The same undisputed monthly invoice and same receipt event have incompatible due dates. The amounts are not alternative periods or minimum response times. Neither clause is conditional, and clause order gives no priority."
+    },
+    {
+      "id": "CT02",
+      "category": "contradiction",
+      "description": "Conflicting exclusive fee currencies",
+      "sections": [
+        "2.3",
+        "6.3"
+      ],
+      "evidence": [
+        {
+          "section": "2.3",
+          "quote": "The monthly service fee is USD 2400 and shall be paid exclusively in USD.",
+          "page": 2
+        },
+        {
+          "section": "6.3",
+          "quote": "The monthly service fee is EUR 2400 and shall be paid exclusively in EUR.",
+          "page": 6
+        }
+      ],
+      "explanation": "The identical monthly service fee must be paid exclusively in two different currencies. No currency option, conversion mechanism, or alternative service is offered. Count the resulting currency/denomination conflict as one issue."
+    },
+    {
+      "id": "CT03",
+      "category": "contradiction",
+      "description": "Deletion conflicts with mandatory retention",
+      "sections": [
+        "3.1",
+        "5.5"
+      ],
+      "evidence": [
+        {
+          "section": "3.1",
+          "quote": "The Supplier shall permanently delete every Customer record 30 calendar days after termination.",
+          "page": 3
+        },
+        {
+          "section": "5.5",
+          "quote": "The Supplier shall retain every Customer record until 90 calendar days after termination before deleting it.",
+          "page": 5
+        }
+      ],
+      "explanation": "Both clauses cover every Customer record, including backups. Permanent deletion at day 30 cannot coexist with retaining those records until day 90. The clauses do not concern different record classes."
+    },
+    {
+      "id": "CT04",
+      "category": "contradiction",
+      "description": "Subcontracting prohibited and required",
+      "sections": [
+        "4.1",
+        "4.2"
+      ],
+      "evidence": [
+        {
+          "section": "4.1",
+          "quote": "The Supplier shall not delegate any part of the services to a subcontractor.",
+          "page": 4
+        },
+        {
+          "section": "4.2",
+          "quote": "The Supplier shall delegate operation of the shared ticket queue to a subcontractor throughout the term.",
+          "page": 4
+        }
+      ],
+      "explanation": "Ticket-queue operation is expressly part of the services. A blanket ban on subcontracting conflicts with mandatory subcontracting of that same service. No exception or consent-based override is provided."
+    },
+    {
+      "id": "CT05",
+      "category": "contradiction",
+      "description": "Conflicting termination notice periods",
+      "sections": [
+        "5.1",
+        "6.4"
+      ],
+      "evidence": [
+        {
+          "section": "5.1",
+          "quote": "For termination by the Customer without cause, the required notice period is exactly 60 calendar days.",
+          "page": 5
+        },
+        {
+          "section": "6.4",
+          "quote": "For termination by the Customer without cause, the required notice period is exactly 15 calendar days.",
+          "page": 6
+        }
+      ],
+      "explanation": "The same party, termination type, and agreement have two mutually exclusive exact notice periods. Unlike competing minimum periods, both cannot be satisfied at once. Neither clause concerns termination for breach."
+    },
+    {
+      "id": "AM01",
+      "category": "ambiguity",
+      "description": "Subjective acceptance standard",
+      "sections": [
+        "1.5"
+      ],
+      "evidence": [
+        {
+          "section": "1.5",
+          "quote": "The Customer may reject a deliverable if it is not commercially satisfactory.",
+          "page": 1
+        }
+      ],
+      "explanation": "Commercial satisfaction determines acceptance but has no stated benchmark, measurement, or decision criteria. Fixed inventory-summary fields do not establish this discretionary acceptance standard. Grade the uncertainty about this criterion as one issue."
+    },
+    {
+      "id": "AM02",
+      "category": "ambiguity",
+      "description": "Unspecified priority response timeframe",
+      "sections": [
+        "3.4"
+      ],
+      "evidence": [
+        {
+          "section": "3.4",
+          "quote": "The Supplier shall respond to priority support requests promptly.",
+          "page": 3
+        }
+      ],
+      "explanation": "Priority requests have an objective outage definition, but promptly provides no measurable response timeframe. Other time limits govern different actions and do not supply a response deadline for priority tickets."
+    },
+    {
+      "id": "AM03",
+      "category": "ambiguity",
+      "description": "Unbounded reasonableness standard for expenses",
+      "sections": [
+        "4.4"
+      ],
+      "evidence": [
+        {
+          "section": "4.4",
+          "quote": "The Customer shall reimburse reasonable transition expenses.",
+          "page": 4
+        }
+      ],
+      "explanation": "Receipts document spending, but no cap, rate, permitted cost classes, or approval criterion determines what counts as reasonable transition expenses. The concern is the reimbursement standard, not a conflict with the separate fixed monthly fee."
+    },
+    {
+      "id": "AM04",
+      "category": "ambiguity",
+      "description": "Undefined material-change threshold for suspension",
+      "sections": [
+        "5.4"
+      ],
+      "evidence": [
+        {
+          "section": "5.4",
+          "quote": "The Supplier may suspend the services if operating conditions change materially.",
+          "page": 5
+        }
+      ],
+      "explanation": "Neither the relevant operating conditions nor a material-change threshold is specified. Notice timing and a five-day suspension cap do not define when the suspension right arises. Grade this trigger uncertainty as one issue."
+    }
+  ]
+}

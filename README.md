@@ -34,6 +34,7 @@ of questions for counsel without any AI call or automatic email sending.
 - `.python-version`: selects Python 3.13 for the Railway build.
 - `.railwayignore`: excludes environment files and local environments from CLI deployment uploads.
 - `test_deployment.py`: checks public demo blocking, health, deployment configuration, and upload protections offline.
+- `benchmark/`: contains the fictional benchmark PDF, separate answer key, editable source, offline builder/validator, and integrity tests.
 
 ## Run locally on macOS
 
@@ -1005,6 +1006,130 @@ is an explicit user-requested local export. Do not upload confidential/personal
 legal documents or publish a tracked environment file. Only the named HTML,
 JavaScript, and synthetic PDF routes serve files; there is no project-directory
 static-file mount.
+
+## Synthetic contract benchmark (Milestone 8A)
+
+This milestone creates ground truth only. It does **not** measure the application's
+detection accuracy or claim that Legal Reviewer finds all 20 issues. Actual
+measurement belongs to Milestone 8B. The production prompts, detectors, UI,
+Railway configuration, and public demo mode are unchanged.
+
+The benchmark is a six-page, approximately 3,000-word commercial services
+agreement between the fictional companies Velnora Labs and Quorvia Works in the
+fictional jurisdiction of Bellmere. It has 36 numbered sections, selectable text,
+normal contract provisions, valid references, and explicitly defined terms as
+controls. It contains no real personal or confidential information.
+
+| Category | Count | Planted topics |
+| --- | --- | --- |
+| `broken_reference` | 6 | Missing targets 12.8, 13.6, 14.2, 15.4, 16.9, and 17.3 |
+| `undefined_term` | 5 | Delivery Window, Payment Reserve, Security Baseline, Service Credit, and Exit Package |
+| `contradiction` | 5 | Invoice due dates; exclusive payment currencies; deletion versus retention; prohibited versus mandatory subcontracting; termination notice periods |
+| `ambiguity` | 4 | Commercially satisfactory acceptance; promptly responding to priority requests; reasonable transition expenses; materially changed operating conditions |
+
+Four contradictions compare clauses on different pages. The fifth compares
+subcontracting clauses on the same page. Conflicts apply to the same subject and
+circumstances, without a later-clause priority rule or a conditional exception.
+For example, the two notice clauses specify **exact** periods, so satisfying a
+longer minimum period cannot resolve the conflict.
+
+### Benchmark files
+
+- `benchmark/fictional_services_agreement.pdf`: the fictional contract to review;
+  it contains no answer-key IDs or annotations identifying the planted issues.
+- `benchmark/answer_key.json`: the separate ground-truth key. Each issue has an
+  ID, category, description, relevant sections, supporting evidence with exact
+  quotes and actual PDF page numbers, and a grading explanation. Reference
+  issues also identify `target_section`; term issues identify `term`.
+- `benchmark/contract_source.json`: editable contract paragraphs and issue
+  specifications. Evidence in this source names sections and quotes, but not
+  estimated page numbers. Keep this file separate from model input too.
+- `benchmark/build.py`: builds the PDF using the existing PyMuPDF dependency,
+  derives evidence locations from extracted PDF text, and independently validates
+  the result. It does not import application detectors, AI prompts, or the SDK.
+- `benchmark/test_benchmark.py` and `benchmark/__init__.py`: offline integrity
+  tests and standard-library test discovery support.
+
+The key includes the PDF's SHA-256 fingerprint, page count, and category totals.
+There are exactly 20 issues and 25 evidence quotations: two per contradiction,
+and one per other issue. Only the PDF should be passed to a detector in a future
+blind measurement. The answer key and source are repository artifacts, not public
+app routes; the application does not link to or serve them. A public repository
+would still make its files readable outside the app, so this is not a secret exam.
+
+### Regenerate and validate locally
+
+From the repository root with the existing environment active:
+
+```sh
+source .venv/bin/activate
+python benchmark/build.py
+python benchmark/build.py --validate-only
+python -m unittest benchmark.test_benchmark -v
+python -m unittest -v
+```
+
+The build command overwrites only the generated benchmark PDF and answer key in
+`benchmark/`. To change the fixture, edit `contract_source.json`, preserving the
+20 issue specifications and updating quotes to match the revised clauses. Then
+regenerate and validate; do not hand-estimate pages or edit the generated answer
+key as a substitute for regeneration. Explicit page breaks give a six-page
+layout. The builder rejects overflowing text rather than silently clipping it.
+No new Python packages, paid API calls, credentials, network access, or deployment
+are required. Node.js 18+ remains needed for the existing full frontend test suite.
+
+The validator checks:
+
+- A readable PDF of 5-8 pages, with extractable text on every page.
+- Exactly 20 unique issue IDs and the precise 6/5/5/4 category totals.
+- Every expected quote on its actual page and inside its stated numbered section,
+  preserving words, punctuation, capitalization, and numbers while collapsing
+  only whitespace from PDF line wrapping.
+- At least two evidence items per contradiction.
+- Six distinct genuinely absent section targets, supported by actual references,
+  and no additional distinct missing reference targets in the PDF.
+- Five distinct intentionally undefined terms with source uses and no exact
+  quoted `means` or `shall mean` definition anywhere in the full document.
+- The PDF fingerprint and page-count agreement with the answer key.
+
+The **20 new offline benchmark tests** also exercise regeneration, changed
+pagination, all source paragraphs surviving extraction, text staying inside page
+bounds, wrong pages/sections, invented quotes, duplicate IDs, bad category counts,
+repaired references, added definitions, fingerprint mismatches, and answer-key
+routes remaining unavailable. All **220 offline tests pass**, including the
+previous 200. Every rendered PDF page was also visually checked for legibility
+and clipping. Validation is ground-truth integrity, not detection performance.
+
+If you upload the benchmark PDF to the current public demo, its rule-based checks
+can run normally. The mock AI route should return its existing clear empty result
+because this PDF is not the small hardcoded demo contract. Do not change that
+behavior or add the answer key to the mock response to make the benchmark pass.
+No real AI analysis was performed in Milestone 8A.
+
+### Grading scope and fairness
+
+Grade by issue identity and supporting clauses, not by the number of displayed
+findings or a literal match to the key's description. The key's quotes are valid
+reference evidence, not the only acceptable excerpts: another exact quote from
+the same relevant clause can support the same issue. Count a missing target once
+as a broken reference; do not separately count uncertainty caused by that omitted
+procedure as another ambiguity. Likewise, a missing term definition is one term
+issue, rather than an extra ambiguity about that same missing definition. The
+currency/denomination conflict is one contradiction, not two separate errors.
+
+The five term issues concern absent **explicit** definitions, consistent with the
+current detector's limited scope; they are potential issues rather than findings
+of legal invalidity. Ordinary proper names and numbered headings are not planted
+undefined terms. The four ambiguity examples have specified grading reasons, but
+a reasonable human can disagree about how much clarification is necessary. The
+program checks objective evidence/structure; it cannot prove all legal
+interpretations or the absolute absence of unintended drafting concerns.
+
+This is one synthetic, deliberately balanced agreement with clean English text,
+simple layout, and no OCR or table challenges. It is a useful controlled fixture,
+not proof of general accuracy, legal correctness, or performance on real
+contracts. A future measurement must assess false positives as well as missed
+issues and keep the answer key out of any AI input.
 
 ## Limits and document handling
 
