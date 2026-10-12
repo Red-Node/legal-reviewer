@@ -49,12 +49,12 @@
   <main>
     <h1>Legal Reviewer</h1>
     <p class="validation-warning" id="prototype-warning"><strong>Prototype — use synthetic or public sample documents only.</strong> Do not upload confidential or personal legal documents. Uploaded text is processed by the server hosting this application. This quality-control tool does not provide legal advice.</p>
-    <p class="intro">Upload a PDF to read its extracted text, page by page.</p>
+    <p class="intro">Upload a PDF or DOCX to read extracted text with source locations.</p>
 
     <form id="upload-form">
-      <label for="pdf-file">Choose a PDF document</label>
-      <input id="pdf-file" type="file" accept=".pdf,application/pdf" aria-describedby="upload-hint">
-      <p class="hint" id="upload-hint">Maximum size: 10 MB. Use a PDF with selectable text. Uploaded documents are not permanently stored.</p>
+      <label for="pdf-file">Choose a PDF or DOCX document</label>
+      <input id="pdf-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-describedby="upload-hint">
+      <p class="hint" id="upload-hint">Maximum size: 10 MB. Use a PDF with selectable text or a Word .docx with text paragraphs/tables. Legacy .doc files are not supported. Uploaded documents are not permanently stored.</p>
       <p class="hint"><a href="/demo-contract.pdf">Download the synthetic demo contract</a> to test the mock AI review.</p>
       <button id="analyze-button" type="submit">Analyze Document</button>
     </form>
@@ -63,6 +63,7 @@
     <p id="error" role="alert" hidden></p>
     <section id="results" aria-label="Extracted document text" hidden>
       <h2 id="summary"></h2>
+      <p id="docx-notice" class="validation-warning" hidden></p>
       <section class="detections" aria-labelledby="review-heading">
         <h2 id="review-heading">Review Findings</h2>
         <p class="hint">Accept or reject each potential issue explicitly. Evidence verification and human decisions are separate. Verified text does not confirm a legal interpretation.</p>
@@ -195,6 +196,8 @@
     const localDevelopment = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
     // Only memory is used. A new upload/selection or page reload clears this state.
     let currentPages = null;
+    let currentDocumentType = "pdf";
+    const docxNotice = document.getElementById("docx-notice");
     let demoController = null;
     let realController = null;
     let editDraft = null;
@@ -290,6 +293,9 @@
       reviewDecisionStatus.textContent = "";
       renderReviewDashboard();
       currentPages = null;
+      currentDocumentType = "pdf";
+      docxNotice.hidden = true;
+      docxNotice.textContent = "";
       if (demoController) demoController.abort();
       demoController = null;
       aiButton.disabled = false;
@@ -334,12 +340,16 @@
       }
     }
 
+    function locationLabel(evidence) {
+      return evidence.locationLabel || evidence.location_label || `Page ${evidence.page}`;
+    }
+
     function viewEvidence(evidence) {
       clearHighlights();
-      const page = pageElements.get(evidence.page);
+      const page = pageElements.get(evidence.locationId || evidence.page);
       const matches = page ? ReviewDashboard.findQuoteMatches(page.sourceText, evidence.quote) : [];
       if (!matches.length) {
-        navigationStatus.textContent = `Cannot locate this exact evidence on Page ${evidence.page}. No text was highlighted.`;
+        navigationStatus.textContent = `Cannot locate this exact evidence at ${locationLabel(evidence)}. No text was highlighted.`;
         reviewDecisionStatus.textContent = navigationStatus.textContent;
         return;
       }
@@ -360,7 +370,7 @@
         offset = match.end;
       }
       page.text.append(document.createTextNode(page.sourceText.slice(offset)));
-      const message = `Page ${evidence.page}: ${matches.length} ${matches.length === 1 ? "match highlighted" : "matches highlighted; this quote does not identify a unique location"}. Evidence text only; legal interpretation is not verified.`;
+      const message = `${locationLabel(evidence)}: ${matches.length} ${matches.length === 1 ? "match highlighted" : "matches highlighted; this quote does not identify a unique location"}. Evidence text only; legal interpretation is not verified.`;
       navigationStatus.textContent = message;
       page.location.textContent = message;
       reviewDecisionStatus.textContent = message;
@@ -430,7 +440,7 @@
         const evidenceList = document.createElement("ul");
         for (const evidence of finding.evidence) {
           const quote = document.createElement("li");
-          quote.append(paragraph(`Page ${evidence.page} — “${evidence.quote}”`));
+          quote.append(paragraph(`${locationLabel(evidence)} — “${evidence.quote}”`));
           if (evidence.quote.trim()) {
             const view = document.createElement("button");
             view.type = "button";
@@ -499,7 +509,7 @@
         for (const evidence of finding.evidence) {
           const quoteItem = document.createElement("li");
           const quoteClass = evidence.verification_status === "verified" ? "verified" : "verification_failed";
-          quoteItem.append(paragraph(`Page ${evidence.page} — “${evidence.quote}”`),
+          quoteItem.append(paragraph(`${locationLabel(evidence)} — “${evidence.quote}”`),
             paragraph(`Quote verification: ${evidence.verification_status}`, `verification-status ${quoteClass}`),
             paragraph(`Matches on claimed page: ${evidence.match_count}`));
           if (evidence.failure_reason) quoteItem.append(paragraph(evidence.failure_reason));
@@ -528,7 +538,7 @@
     }
 
     realButton.addEventListener("click", async () => {
-      if (!currentPages || realButton.disabled || !localDevelopment) return;
+      if (!currentPages || currentDocumentType === "docx" || realButton.disabled || !localDevelopment) return;
       // Only this explicit click can submit real review; cancel sends no request.
       if (!window.confirm("Real Claude review will send this document's extracted text to Anthropic if enabled on the server. API charges may apply. Do you want to request real review?")) {
         realStatus.textContent = "Cancelled. No document text was sent for real review.";
@@ -574,7 +584,7 @@
     });
 
     aiButton.addEventListener("click", async () => {
-      if (!currentPages || aiButton.disabled) return;
+      if (!currentPages || currentDocumentType === "docx" || aiButton.disabled) return;
       const reviewPages = currentPages;
       const reviewToken = reviewState.token();
       demoController = new AbortController();
@@ -623,7 +633,7 @@
       for (const term of terms) {
         const item = document.createElement("li");
         const label = document.createElement("strong");
-        label.textContent = `${term.term} (Page ${term.page})`;
+        label.textContent = `${term.term} (${locationLabel(term)})`;
         const excerpt = document.createElement("p");
         excerpt.textContent = `“${term.excerpt}”`;
         item.append(label, excerpt);
@@ -657,11 +667,15 @@
 
       const file = fileInput.files[0];
       if (!file) {
-        showError("Please choose a PDF file.");
+        showError("Please choose a PDF or DOCX file.");
         return;
       }
-      if (!file.name.toLowerCase().endsWith(".pdf")) {
-        showError("Please upload a PDF file (.pdf).");
+      if (file.name.toLowerCase().endsWith(".doc")) {
+        showError("Legacy .doc files are not supported. Save a .docx copy in Word.");
+        return;
+      }
+      if (!/\.(pdf|docx)$/i.test(file.name)) {
+        showError("Please upload a PDF or DOCX file (.pdf or .docx).");
         return;
       }
       if (file.size > maxFileSize) {
@@ -673,39 +687,46 @@
       formData.append("file", file);
       button.disabled = true;
       fileInput.disabled = true;
-      status.textContent = "Reading your PDF…";
+      status.textContent = "Reading your document…";
 
       try {
         const response = await fetch("/analyze", { method: "POST", body: formData });
         const data = await response.json();
         if (uploadReviewToken !== reviewState.token()) return;
         if (!response.ok) {
-          throw new Error(typeof data.detail === "string" ? data.detail : "The document could not be read. Please try another PDF.");
+          throw new Error(typeof data.detail === "string" ? data.detail : "The document could not be read. Please try another PDF or DOCX.");
         }
 
-        summary.textContent = `${data.filename} — ${data.total_pages} ${data.total_pages === 1 ? "page" : "pages"}`;
-        for (const page of data.pages) {
+        currentDocumentType = data.document_type || "pdf";
+        const docx = currentDocumentType === "docx";
+        const sources = docx ? data.locations : data.pages;
+        docxNotice.hidden = !docx;
+        docxNotice.textContent = docx ? data.location_notice : "";
+        aiButton.disabled = docx;
+        realButton.disabled = docx;
+        summary.textContent = docx ? `${data.filename} — ${data.total_locations} source locations (not pages)` : `${data.filename} — ${data.total_pages} ${data.total_pages === 1 ? "page" : "pages"}`;
+        for (const page of sources) {
           const section = document.createElement("section");
           section.className = "page";
           const heading = document.createElement("h2");
-          heading.textContent = `Page ${page.number}`;
+          heading.textContent = docx ? page.location_label : `Page ${page.number}`;
           heading.tabIndex = -1;
           const text = document.createElement("pre");
           // Use textContent so document text is always displayed as plain text.
           text.textContent = page.text.trim() ? page.text : "No extractable text on this page.";
           const location = paragraph("", "hint");
           section.append(heading, location, text);
-          pageElements.set(page.number, {section, heading, text, location, sourceText: page.text});
+          pageElements.set(page.location_id || page.number, {section, heading, text, location, sourceText: page.text});
           pages.append(section);
         }
         for (const section of data.sections) {
           const item = document.createElement("li");
-          item.textContent = `Section ${section.number} — ${section.title} (Page ${section.page})`;
+          item.textContent = `Section ${section.number} — ${section.title} (${locationLabel(section)})`;
           detectedSections.append(item);
         }
         for (const reference of data.references) {
           const item = document.createElement("li");
-          item.textContent = `Section ${reference.number} (Page ${reference.page}) — “${reference.text}”`;
+          item.textContent = `Section ${reference.number} (${locationLabel(reference)}) — “${reference.text}”`;
           sectionReferences.append(item);
         }
         noSections.hidden = data.sections.length > 0;
@@ -713,7 +734,7 @@
         for (const reference of data.broken_references) {
           const item = document.createElement("li");
           const label = document.createElement("strong");
-          label.textContent = `Section ${reference.number} (Page ${reference.page}) — ${reference.status}`;
+          label.textContent = `Section ${reference.number} (${locationLabel(reference)}) — ${reference.status}`;
           const excerpt = document.createElement("p");
           excerpt.textContent = `“${reference.excerpt}”`;
           const explanation = document.createElement("p");
@@ -729,7 +750,7 @@
         for (const term of data.potentially_undefined_terms) {
           const item = document.createElement("li");
           const label = document.createElement("strong");
-          label.textContent = `Potential issue: ${term.term} (Page ${term.page}) — ${term.status}`;
+          label.textContent = `Potential issue: ${term.term} (${locationLabel(term)}) — ${term.status}`;
           const excerpt = document.createElement("p");
           excerpt.textContent = `“${term.excerpt}”`;
           const explanation = document.createElement("p");
@@ -743,10 +764,10 @@
         noUndefinedTerms.hidden = Boolean(data.term_validation_warning) ||
           data.candidate_term_uses.length === 0 || data.potentially_undefined_terms.length > 0;
         results.hidden = false;
-        currentPages = data.pages;
+        currentPages = sources;
         reviewState.replaceSource("rules", ReviewDashboard.ruleFindings(data), uploadReviewToken);
         renderReviewDashboard();
-        showRealControls(currentPages);
+        if (!docx) showRealControls(currentPages);
         status.textContent = "Document processing complete.";
       } catch (failure) {
         showError(failure instanceof TypeError ? "Could not connect to the server. Check that the application is running and try again." : failure.message);

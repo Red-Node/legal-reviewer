@@ -82,3 +82,37 @@ def verify_findings(analysis, pages):
         finding["status"] = "verification_failed" if reasons else "verified"
         finding["failure_reasons"] = reasons
     return result
+
+
+def verify_docx_evidence(evidence, locations):
+    """Offline exact quotation checks against explicit DOCX locations, not pages.
+
+    This supports source navigation/tests; it does not enable DOCX AI analysis or
+    turn a source quotation into legal validation or a human review decision.
+    """
+    sources = {}
+    for source in locations:
+        identifier = source.get("location_id")
+        if not isinstance(identifier, str) or not identifier or identifier in sources:
+            raise ValueError("DOCX locations need unique nonempty identifiers.")
+        if not isinstance(source.get("text"), str):
+            raise ValueError("DOCX location text must be a string.")
+        sources[identifier] = source
+    result = deepcopy(evidence)
+    for item in result:
+        quote, identifier = item.get("quote"), item.get("location_id")
+        failure, count = None, 0
+        source = sources.get(identifier) if isinstance(identifier, str) else None
+        if "page" in item:
+            failure = "DOCX evidence must use a location identifier, not a page number."
+        elif not isinstance(quote, str) or not quote.strip():
+            failure = "Quote is empty or is not text."
+        elif source is None:
+            failure = "Claimed DOCX location was not supplied among the original locations."
+        else:
+            count = _count_matches(_normalize_whitespace(quote), _normalize_whitespace(source["text"]))
+            if count == 0:
+                failure = "Quote was not found at the claimed DOCX location after whitespace normalization."
+        item.update(verification_status="verification_failed" if failure else "verified",
+                    failure_reason=failure, match_count=count)
+    return result

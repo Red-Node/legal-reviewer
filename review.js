@@ -2,20 +2,24 @@
 (function (root) {
   "use strict";
 
+  function ruleLocation(item) {
+    return item.location_id ? {locationId: item.location_id, locationLabel: item.location_label} : {page: item.page};
+  }
+
   function ruleFindings(document) {
     return [
       ...document.broken_references.map(reference => ({
         category: "Potential broken reference",
         title: `Section ${reference.number} was not found`,
         explanation: reference.explanation,
-        evidence: [{quote: reference.excerpt, page: reference.page, verificationStatus: "not_applicable"}],
+        evidence: [{quote: reference.excerpt, ...ruleLocation(reference), verificationStatus: "not_applicable"}],
         verificationStatus: "not_applicable",
       })),
       ...document.potentially_undefined_terms.map(term => ({
         category: "Potentially undefined term",
         title: `Definition not found for ${term.term}`,
         explanation: term.explanation,
-        evidence: [{quote: term.excerpt, page: term.page, verificationStatus: "not_applicable"}],
+        evidence: [{quote: term.excerpt, ...ruleLocation(term), verificationStatus: "not_applicable"}],
         verificationStatus: "not_applicable",
       })),
     ];
@@ -82,7 +86,10 @@
           !finding.title.trim() || !finding.explanation.trim() || !Array.isArray(finding.evidence) ||
           !finding.evidence.length) return false;
       const validEvidence = finding.evidence.every(item => item && typeof item.quote === "string" &&
-        item.quote.trim() && Number.isInteger(item.page) && item.page > 0);
+        item.quote.trim() && (
+          (Number.isInteger(item.page) && item.page > 0 && !item.locationId) ||
+          (finding.source === "rules" && typeof item.locationId === "string" && !Object.hasOwn(item, "page") &&
+            pages.some(source => source.location_id === item.locationId && source.location_label === item.locationLabel))));
       if (!validEvidence) return false;
       if (finding.source === "rules") return ["Potential broken reference", "Potentially undefined term"].includes(finding.category) &&
         finding.verificationStatus === "not_applicable" &&
@@ -106,7 +113,7 @@
       "Potentially undefined term": "Could you please clarify the intended meaning of this term and where it is defined?",
     };
     const questions = eligible.map((finding, index) => {
-      const evidence = finding.evidence.map(item => `   “${item.quote}” (Page ${item.page})`).join("\n");
+      const evidence = finding.evidence.map(item => `   “${item.quote}” (${item.locationId ? item.locationLabel : `Page ${item.page}`})`).join("\n");
       return `${index + 1}. ${finding.title}\n   ${finding.explanation}\n${evidence}\n` +
         `   ${clarificationQuestions[finding.category]}`;
     });

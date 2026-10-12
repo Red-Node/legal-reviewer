@@ -13,6 +13,7 @@ from ai_reviewer import (DEMO_CONTRACT_TEXT, ReviewError, format_document_pages,
 
 from detection import detect_sections_and_references, validate_references
 from terms import detect_terms, validate_terms
+from docx_reader import DocxError, extract_docx, located_results
 
 app = FastAPI(title="Legal Reviewer")
 BASE_DIR = Path(__file__).resolve().parent
@@ -48,6 +49,15 @@ def download_demo_contract():
     })
 
 
+def _reject_docx_ai_payload(payload):
+    if not isinstance(payload, dict):
+        return
+    sources = payload.get("pages")
+    if ("locations" in payload or payload.get("document_type") == "docx" or
+            (isinstance(sources, list) and any(isinstance(source, dict) and "location_id" in source for source in sources))):
+        raise HTTPException(status_code=400, detail="AI review is not supported for DOCX yet. Its paragraph/table locations cannot be represented as PDF evidence pages. No Anthropic request was made.")
+
+
 @app.post("/ai-review-demo")
 async def ai_review_demo(request: Request):
     """Stateless, local-only demo. Text lives in this request, not a server cache."""
@@ -58,6 +68,7 @@ async def ai_review_demo(request: Request):
         body.extend(chunk)
     try:
         payload = json.loads(body)
+        _reject_docx_ai_payload(payload)
         if not isinstance(payload, dict) or set(payload) != {"pages"}:
             raise ValueError("Expected document pages only.")
         pages = payload["pages"]
@@ -114,6 +125,7 @@ async def real_review(request: Request):
         body.extend(chunk)
     try:
         payload = json.loads(body)
+        _reject_docx_ai_payload(payload)
         if not isinstance(payload, dict) or set(payload) != {"pages", "confirmed"}:
             raise ValueError
         if payload["confirmed"] is not True:
@@ -137,41 +149,54 @@ def analyze_document(file: UploadFile | None = File(default=None), response: Res
     if response is not None:
         response.headers["Cache-Control"] = "no-store"
     if file is None:
-        raise HTTPException(status_code=400, detail="Please choose a PDF file.")
+        raise HTTPException(status_code=400, detail="Please choose a PDF or DOCX file.")
 
     # FastAPI may use a temporary file for uploads. Always close it to clean up.
     try:
         filename = file.filename or ""
-        if not filename.lower().endswith(".pdf"):
-            raise HTTPException(status_code=400, detail="Please upload a PDF file (.pdf).")
+        extension = Path(filename).suffix.lower()
+        if extension == ".doc":
+            raise HTTPException(status_code=400, detail="Legacy .doc files are not supported. Open the file in Word and save it as .docx.")
+        if extension not in (".pdf", ".docx"):
+            raise HTTPException(status_code=400, detail="Please upload a PDF or DOCX file (.pdf or .docx).")
 
         # Read at most one byte beyond the limit, even if browser checks are bypassed.
         contents = file.file.read(MAX_FILE_SIZE + 1)
         if len(contents) > MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="The file is too large. The maximum size is 10 MB.")
         if not contents:
-            raise HTTPException(status_code=400, detail="This file is empty. Please choose a valid PDF.")
+            raise HTTPException(status_code=400, detail="This file is empty. Please choose a valid PDF or DOCX.")
 
-        try:
-            # Open the uploaded bytes directly; never save a document to the project.
-            with pymupdf.open(stream=contents, filetype="pdf") as document:
-                if not document.is_pdf:
-                    raise HTTPException(status_code=400, detail="This file is not a valid PDF.")
-                if document.needs_pass:
-                    raise HTTPException(status_code=400, detail="This PDF is password protected. Please upload an unlocked copy.")
+        locations = None
+        if extension == ".docx":
+            try:
+                locations = extract_docx(contents)
+            except DocxError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from None
+            # Chunk ordinals are internal detector indices, never DOCX page numbers.
+            pages = [{"number": index, "text": source["text"]}
+                     for index, source in enumerate(locations, 1)]
+        else:
+            try:
+                # Open the uploaded bytes directly; never save a document to the project.
+                with pymupdf.open(stream=contents, filetype="pdf") as document:
+                    if not document.is_pdf:
+                        raise HTTPException(status_code=400, detail="This file is not a valid PDF.")
+                    if document.needs_pass:
+                        raise HTTPException(status_code=400, detail="This PDF is password protected. Please upload an unlocked copy.")
 
-                pages = [
-                    {"number": number, "text": page.get_text("text", sort=True)}
-                    for number, page in enumerate(document, start=1)
-                ]
-        except (RuntimeError, ValueError):
-            raise HTTPException(status_code=400, detail="This PDF is invalid or damaged and could not be read.") from None
+                    pages = [
+                        {"number": number, "text": page.get_text("text", sort=True)}
+                        for number, page in enumerate(document, start=1)
+                    ]
+            except (RuntimeError, ValueError):
+                raise HTTPException(status_code=400, detail="This PDF is invalid or damaged and could not be read.") from None
 
-        if not any(page["text"].strip() for page in pages):
-            raise HTTPException(
-                status_code=400,
-                detail="This PDF has no extractable text. It may contain scanned images. Please upload a PDF with selectable text.",
-            )
+            if not any(page["text"].strip() for page in pages):
+                raise HTTPException(
+                    status_code=400,
+                    detail="This PDF has no extractable text. It may contain scanned images. Please upload a PDF with selectable text.",
+                )
 
         detections = detect_sections_and_references(pages)
         # Detect all pages first, so a reference can point to a later section.
@@ -183,7 +208,7 @@ def analyze_document(file: UploadFile | None = File(default=None), response: Res
             detections["sections"],
             detections["references"],
         )
-        return {
+        result = {
             "filename": filename,
             "total_pages": len(pages),
             "pages": pages,
@@ -192,5 +217,13 @@ def analyze_document(file: UploadFile | None = File(default=None), response: Res
             **term_detections,
             **term_validation,
         }
+        if locations is not None:
+            result.pop("pages")
+            result.pop("total_pages")
+            result = located_results(result, locations)
+            result.update(document_type="docx", locations=locations, total_locations=len(locations),
+                          ai_supported=False,
+                          location_notice="DOCX locations identify body paragraphs and table cells, not rendered pages. Headers, footnotes, text boxes, tracked changes and automatic list numbers may be omitted. AI review is unavailable for DOCX; its current evidence format requires PDF pages.")
+        return result
     finally:
         file.file.close()

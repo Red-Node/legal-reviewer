@@ -1,7 +1,8 @@
 # Legal Reviewer
 
-A minimal PDF text reader built with Python, FastAPI, PyMuPDF, and plain HTML,
-CSS, and JavaScript. It extracts text by page and uses deterministic rules to
+A minimal PDF and DOCX text reader built with Python, FastAPI, PyMuPDF, python-docx,
+and plain HTML, CSS, and JavaScript. It uses PDF pages or DOCX paragraph/table
+locations and deterministic rules to
 detect numbered section headings and explicit section references, then flag
 references whose targets were not found among recognized headings. It also detects
 explicit term definitions and candidate uses of capitalized multi-word terms,
@@ -13,11 +14,13 @@ of questions for counsel without any AI call or automatic email sending.
 
 ## Files
 
-- `main.py`: serves the webpage, handles PDF uploads, generates the demo PDF, and exposes the mock-only review endpoint.
+- `main.py`: serves the webpage, handles PDF and DOCX uploads, generates the demo PDF, and exposes the mock-only review endpoint.
 - `detection.py`: identifies headings and references, then compares exact section numbers.
 - `terms.py`: detects definitions and candidate uses, then checks for potential missing definitions.
 - `ai_reviewer.py`: prepares real Claude analysis (inactive), and provides the synthetic mock review using the existing JSON parser and quote verifier.
-- `quote_verifier.py`: independently checks evidence quotes against their claimed original pages, entirely offline.
+- `quote_verifier.py`: independently checks PDF evidence pages and explicit DOCX source locations, entirely offline.
+- `docx_reader.py`: validates Word packages and extracts body paragraphs/tables in order, with location IDs instead of invented pages.
+- `test_docx.py`: offline DOCX extraction, upload security, source verification, and browser review/highlighting/counsel tests.
 - `.env.example`: shows the local configuration variable names without a real key.
 - `index.html`: contains the upload form, styling, and JavaScript that displays results.
 - `review.js`: manages unified finding IDs, human decisions, wording edits, evidence acceptance checks, counters, exact quote matching, and counsel letter drafts in browser memory.
@@ -882,8 +885,8 @@ PUBLIC_DEMO_ONLY=true exec python -m uvicorn main:app --host 0.0.0.0 --port $POR
 Railway supplies `PORT`. Binding to `0.0.0.0` makes the service reachable through
 Railway's network. There is no development reload process, database, volume,
 frontend build, or Node.js production dependency. `.python-version` selects
-Python 3.13. The existing six pinned Python dependencies are sufficient and
-remain unchanged. Routine Uvicorn access logging is disabled; application code
+Python 3.13. Production dependencies are pinned in `requirements.txt`; DOCX
+support adds python-docx and its lxml dependency. Routine Uvicorn access logging is disabled; application code
 does not log document contents or API keys.
 
 The configured readiness check is **GET `/health`**, with a 60-second startup
@@ -1562,3 +1565,118 @@ python -m unittest -v
 Tests use synthetic grading cases and block AI/network calls. Tests that inspect
 the actual capture skip when it is absent in a fresh clone, because paid capture
 files intentionally remain local. No account credentials are needed for grading.
+
+
+## DOCX support (Milestone 8C)
+
+Choose **PDF or DOCX** in the upload form. The 10 MB upload limit applies to
+both. Word packages are validated as actual macro-free DOCX archives, not trusted
+based on filename or MIME type alone. Legacy `.doc`, `.docm`, encrypted/damaged
+packages, XML DTD/entity declarations, archives with more than 2,000 members, and
+archives expanding beyond 50 MB are rejected. Nothing is extracted to server
+files; the existing temporary upload is closed after processing.
+
+The body is read using python-docx's
+[document-order paragraph/table iterator](https://python-docx.readthedocs.io/en/latest/api/document.html#docx.document.Document.iter_inner_content).
+Paragraphs before, between, and after tables keep their order. Tables are read
+row by row, left to right, with nested tables supported and merged cells read
+once. Typed section identifiers, text runs, and hyperlink display text are kept;
+external hyperlinks are never fetched. An explicit Word page break does not
+create a page number in this application.
+
+DOCX results use **Paragraph 1** or **Table 1, row 1, cell 2, Paragraph 1**,
+with stable source-location IDs for the current extraction. Body paragraph
+numbers count body paragraphs, including empty ones, separately from table-cell
+paragraphs. They are not Word's printed page or paragraph numbers. Empty
+paragraphs remain in the displayed source so location labels stay consistent.
+
+The unchanged rule-based detectors process those text chunks internally. Their
+legacy integer chunk field is translated to explicit DOCX locations before the
+response leaves the server; DOCX responses have `locations`, not `pages` or
+`total_pages`. The extracted text, headings, definitions, broken references, and
+potentially undefined terms remain available for human review.
+
+Accept, Reject, Edit, exact text highlighting, counsel drafts, Copy, Download,
+outdated warnings, and resetting after another upload work for DOCX rule-based
+findings. Counsel drafts show the original paragraph/table labels and excerpts.
+Highlighting matches only the selected location and reports missing or repeated
+quotes without claiming uniqueness. The offline DOCX quote-verification helper
+checks explicit location IDs with whitespace normalization; it rejects invented
+page numbers and preserves failed quotations/reasons. Rule-based findings retain
+the existing "verification not applied" status; neither source navigation nor
+quote presence is a legal conclusion.
+
+**DOCX AI review is not supported in this milestone.** Both AI buttons are
+unavailable for DOCX, the limitation is displayed beside the document, and the
+server rejects DOCX-location payloads at either AI endpoint before a review
+call. The current Claude prompt/parser requires PDF page evidence, so this
+implementation does not reinterpret paragraph numbers as pages or alter that
+format. Existing PDF mock/real review and public-demo-only safeguards remain
+unchanged. No real Claude requests were made to implement or test this feature.
+
+### Test DOCX locally
+
+Install the new dependency in your existing virtual environment and start the app:
+
+```bash
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+1. In Word, create a fictional document. Put these lines in separate paragraphs;
+   type the section numbers as text rather than using Word automatic numbering:
+
+   ```text
+   Section 1.1 — Payment Terms
+   "Business Day" means Monday through Friday.
+   Use the Delivery Window pursuant to Section 9.9.
+   ```
+
+2. Insert a one-row, two-column table after those paragraphs. Enter
+   `Pay on the Business Day.` in the first cell and `See Section 1.1.`
+   in the second cell. Add `Section 2.1 — Delivery Terms` after the table.
+3. Save as **Word Document (.docx)**. Open `http://127.0.0.1:8000/`, refresh
+   the page, choose the file, and click **Analyze Document**.
+4. Check the paragraph/table order. Section 9.9 should be a potential broken
+   reference at Paragraph 3; Delivery Window should be a potentially undefined
+   term there. Business Day should be defined and Section 1.1 should resolve.
+5. Click **View in document**, then Accept/Reject an issue. Edit an accepted
+   finding, save, and check that it returns to pending. Accept again and click
+   **Draft Questions for Counsel**. The draft should use your saved wording and
+   paragraph/table references, without invented page numbers. Test Copy and
+   Download .txt. Changing a finding should mark the draft outdated.
+6. Check the DOCX AI limitation notice and disabled AI controls. Upload a PDF
+   and confirm PDF pages/AI controls return, while decisions/drafts from the
+   previous document are cleared. No real API test is needed.
+
+Run all offline tests (Node.js 18+ is still needed for browser-state tests):
+
+```bash
+python -m unittest test_docx -v
+python -m unittest -v
+python -m pip check
+```
+
+### DOCX limitations and deployment
+
+- This is text extraction, not a Word renderer. Headers, footers, footnotes,
+  endnotes, comments, text boxes, content controls, and tracked revisions may
+  be omitted. Images/OCR and password-protected documents are unsupported.
+  Accept tracked changes in a separate copy before uploading it.
+- Word's automatic list/heading numbers and fields are not reconstructed. Type
+  section identifiers into the paragraph text for reliable section detection.
+  Definitions/references split across separate paragraphs or table cells may
+  be missed. Existing detector limitations still apply.
+- Tables use source row/cell order, which may differ from the visual order of
+  complex layouts. Merged cell labels identify their first grid location, not
+  every cell they visually span. More than ten levels of table nesting are
+  rejected. Editing the Word document can change location IDs on a new upload.
+- Quote checks confirm only the extracted body text. They cannot establish
+  completeness of extraction or correctness of legal interpretation.
+- Railway settings and start command were not changed, and no deployment was
+  performed. A future build must install the updated requirements. python-docx
+  depends on lxml, usually installed from a Linux wheel; the Railway build and
+  runtime memory usage still need checking on the next authorized deployment.
+  Compressed documents can use more RAM than their upload size, even with the
+  bounded expansion limit. No API key is required for public demo operation.
