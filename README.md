@@ -34,7 +34,8 @@ of questions for counsel without any AI call or automatic email sending.
 - `.python-version`: selects Python 3.13 for the Railway build.
 - `.railwayignore`: excludes environment files and local environments from CLI deployment uploads.
 - `test_deployment.py`: checks public demo blocking, health, deployment configuration, and upload protections offline.
-- `benchmark/`: contains the fictional benchmark PDF, separate answer key, editable source, offline builder/validator, and integrity tests.
+- `benchmark/`: contains the fictional benchmark PDF, separate answer key, editable source, offline builder/validator, integrity tests, and baseline evaluator.
+- `benchmark/results/`: stores offline JSON and Markdown evaluation reports; these are not served by the app.
 
 ## Run locally on macOS
 
@@ -1130,6 +1131,153 @@ simple layout, and no OCR or table challenges. It is a useful controlled fixture
 not proof of general accuracy, legal correctness, or performance on real
 contracts. A future measurement must assess false positives as well as missed
 issues and keep the answer key out of any AI input.
+
+## Offline benchmark evaluation (Milestone 8B)
+
+Milestone 8B measures the existing rule-based system against the unchanged
+Milestone 8A PDF and answer key. It does not improve the detectors or use the
+hardcoded mock AI findings. It makes no API requests and does not change the
+production prompts, model settings, UI, Railway configuration, or public demo
+mode. Contradictions and ambiguities require a separately authorized real AI
+measurement and remain **not evaluated** here.
+
+### Run the evaluation locally
+
+From the repository root, activate the existing environment and run:
+
+```sh
+source .venv/bin/activate
+python -m benchmark.evaluate
+```
+
+No server, browser, credentials, new dependencies, or internet connection are
+needed. The tool calls the actual `main.analyze_document` application function
+with the benchmark PDF as its upload. This uses exactly the app's sorted PyMuPDF
+extraction, section/reference detection and validation, and term detection and
+validation. No answer-key content is supplied to those detectors. The evaluator
+reads the key separately for grading and verifies its PDF fingerprint first; it
+rejects stale or invalid benchmark artifacts rather than regenerating them.
+
+The command prints the category and overall scores and writes:
+
+- `benchmark/results/rule_based_baseline.json`: metrics, raw predictions,
+  one-to-one matches and matching reasons, missed issues, unmatched predictions,
+  unevaluated AI issues, and reproducibility metadata.
+- `benchmark/results/rule_based_baseline.md`: a readable score table and the
+  matched/missed/unmatched details with source quotations and page/section
+  locations.
+
+Re-running explicitly overwrites those two report files. To write another copy:
+
+```sh
+python -m benchmark.evaluate --output-dir /tmp/legal-reviewer-baseline
+```
+
+Reports have no changing timestamp. They record Python/PyMuPDF versions and
+SHA-256 fingerprints of the PDF, answer key, production analysis/detector files,
+benchmark validation code, and evaluator. Identical inputs and runtime produce
+identical reports. These are local repository artifacts; there are no public UI
+links or server routes for the reports or answer key. Do not send the key or
+reports as model input in a future blind AI evaluation.
+
+### Matching and scoring rules
+
+A correct prediction must match all of the following:
+
+1. The ground-truth category.
+2. The exact reference target number, or the complete undefined term name.
+   Surrounding term quotation marks and whitespace are normalized; case, word
+   spelling, pluralization, and numeric identifiers are preserved. Section 2.1
+   does not match 2.10, and Closing Date does not match Final Closing Date.
+3. A detector source excerpt on the claimed page. Only the detector's leading or
+   trailing clipping ellipsis is removed. The remaining text must occur
+   literally after whitespace normalization; no fuzzy or semantic matching occurs.
+4. A uniquely located reference/term mention in the correct numbered section,
+   inside a supporting quote recorded in the answer key. Full detector excerpts
+   need not equal full key quotations: the production snippets are often clipped
+   or contain adjacent context. The matching identifier must lie in the key quote.
+
+Section locations for grading come independently from the numbered headings in
+extracted text, rather than treating the application's detected headings as
+infallible. Source offsets in JSON refer to whitespace-normalized section body
+text, not PDF coordinates. If the excerpt identifies multiple possible source
+mentions, no unique location is assumed and no automatic match is awarded.
+
+An evidence-supported, deterministic maximum-cardinality assignment gives each
+prediction at most one issue and each issue at most one prediction. Raw warnings
+are not silently deduplicated. An additional warning for an already matched issue
+remains a false positive, with duplicate links recorded; it cannot inflate true
+positives. All unmatched warnings remain visible with their grading reasons.
+
+For the two evaluated categories:
+
+- TP: number of distinct matched planted issues.
+- FP: raw predictions minus TP, including unmatched duplicate warnings.
+- FN: evaluated ground-truth issues minus TP.
+- Precision: TP / predictions produced.
+- Recall: TP / evaluated ground-truth issues.
+
+A zero denominator is reported as JSON `null` and Markdown **N/A**, rather than
+an invented perfect score. Overall metrics aggregate only the evaluated rule-based
+categories. The nine AI issues have `not_evaluated` status and null prediction,
+TP/FP/FN, precision, and recall fields; they are not counted as missed rule issues.
+
+### Observed baseline on the current benchmark
+
+These values come from the generated reports, not hardcoded evaluator scores.
+
+| Category | Ground truth | Predictions | TP | FP | FN | Precision | Recall |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Broken references | 6 | 6 | 6 | 0 | 0 | 100.00% | 100.00% |
+| Undefined terms | 5 | 11 | 5 | 6 | 0 | 45.45% | 100.00% |
+| Rule-based overall | 11 | 17 | 11 | 6 | 0 | 64.71% | 100.00% |
+
+The five contradictions and four ambiguities are **not evaluated**. This is not
+an all-20 detection score and says nothing about Claude's benchmark performance.
+
+No planted rule-based issues were missed. All six false-positive warnings concern
+**Business Days**, in these locations:
+
+| Page | Section |
+| ---: | --- |
+| 2 | 2.1 |
+| 2 | 2.4 |
+| 3 | 3.6 |
+| 5 | 5.3 |
+| 5 | 5.4 |
+| 5 | 5.5 |
+
+The agreement defines **Business Day**. Its ordinary plural uses are not additional
+planted undefined-term issues under the answer key. The existing detector's exact
+name comparison nevertheless flags **Business Days**. These are six warning
+occurrences of one repeated phrase, not six independent drafting problem types.
+They have not been filtered or corrected to improve the baseline.
+
+### Offline tests and fairness limitations
+
+```sh
+python -m unittest benchmark.test_evaluation -v
+python -m unittest -v
+```
+
+All **246 offline tests pass**, including **26 new evaluation tests**. Coverage
+includes exact identifiers, complete terms, category boundaries, wrong pages and
+sections, fabricated evidence, whitespace and clipping, repeated ambiguous quotes,
+duplicates and one-to-one assignment, score arithmetic and zero denominators,
+AI exclusions, non-mutating grading, agreement with the real `/analyze` endpoint,
+report exports, reproducibility, and reports remaining inaccessible through the
+public app. Tests mock the SDK and block network connections; benchmark scores
+are computed from actual outputs rather than asserted as fixed expected results.
+
+This is one clean, deliberately balanced synthetic contract. Perfect recall for
+its 11 rule-based issues is not evidence of general contract-review accuracy.
+Strict evidence matching may under-credit a correct warning with a non-unique
+excerpt or an alternative source mention outside the key's quote. Such unmatched
+predictions should be manually reviewed before making broader performance claims.
+Counting raw warning occurrences makes repeated warnings affect precision; it is
+not a deduplicated issue-type precision score. The inherited answer-key scope and
+human ambiguity judgments remain limitations. No legal correctness, all-20
+coverage, or paid AI performance claim is made.
 
 ## Limits and document handling
 

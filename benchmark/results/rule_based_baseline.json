@@ -1,0 +1,713 @@
+{
+  "mode": "rule_based_only",
+  "categories": {
+    "broken_reference": {
+      "status": "evaluated",
+      "ground_truth_count": 6,
+      "predictions_produced": 6,
+      "true_positives": 6,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "undefined_term": {
+      "status": "evaluated",
+      "ground_truth_count": 5,
+      "predictions_produced": 11,
+      "true_positives": 5,
+      "false_positives": 6,
+      "false_negatives": 0,
+      "precision": 0.45454545454545453,
+      "recall": 1.0
+    },
+    "contradiction": {
+      "status": "not_evaluated",
+      "ground_truth_count": 5,
+      "predictions_produced": null,
+      "true_positives": null,
+      "false_positives": null,
+      "false_negatives": null,
+      "precision": null,
+      "recall": null,
+      "reason": "Requires AI analysis; no real or mock AI run is included in this offline baseline."
+    },
+    "ambiguity": {
+      "status": "not_evaluated",
+      "ground_truth_count": 4,
+      "predictions_produced": null,
+      "true_positives": null,
+      "false_positives": null,
+      "false_negatives": null,
+      "precision": null,
+      "recall": null,
+      "reason": "Requires AI analysis; no real or mock AI run is included in this offline baseline."
+    }
+  },
+  "matching_policy": {
+    "identity": "Exact category and reference number or complete term; whitespace/surrounding term quotes normalized, case and plurals preserved.",
+    "evidence": "Detector excerpt must uniquely locate its identifier on the claimed page; source mention must lie inside a key quote in the same section.",
+    "offsets": "Source start/end offsets are relative to whitespace-normalized section body text, not PDF coordinates.",
+    "duplicates": "One-to-one maximum-cardinality assignment; extra warnings for matched issues remain false positives with duplicate labels.",
+    "ai": "Contradictions and ambiguities excluded from scoring, with null prediction/metric fields."
+  },
+  "overall": {
+    "scope": [
+      "broken_reference",
+      "undefined_term"
+    ],
+    "ground_truth_count": 11,
+    "predictions_produced": 17,
+    "true_positives": 11,
+    "false_positives": 6,
+    "false_negatives": 0,
+    "precision": 0.6470588235294118,
+    "recall": 1.0,
+    "total_ground_truth_count": 20,
+    "not_evaluated_ground_truth_count": 9
+  },
+  "matched_issues": [
+    {
+      "issue_id": "BR01",
+      "prediction": {
+        "id": "P001",
+        "category": "broken_reference",
+        "identity": "12.8",
+        "page": 1,
+        "excerpt": "…e Supplier shall use the escalation route stated in Section 12.8 for a disputed Acceptance Record. Until",
+        "raw": {
+          "number": "12.8",
+          "text": "Section 12.8",
+          "page": 1,
+          "excerpt": "…e Supplier shall use the escalation route stated in Section 12.8 for a disputed Acceptance Record. Until",
+          "status": "Not found",
+          "explanation": "No heading numbered 12.8 was detected in this document. The heading may have been missed; this is a potential error."
+        }
+      },
+      "matching_reason": {
+        "category": "broken_reference",
+        "exact_identity": "12.8",
+        "page": 1,
+        "section": "1.6",
+        "expected_quote": "The Supplier shall use the escalation route stated in Section 12.8 for a disputed Acceptance Record.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "BR02",
+      "prediction": {
+        "id": "P002",
+        "category": "broken_reference",
+        "identity": "13.6",
+        "page": 2,
+        "excerpt": "…invoice classification code shall be assigned under Section 13.6. The code shall appear beside the",
+        "raw": {
+          "number": "13.6",
+          "text": "Section 13.6",
+          "page": 2,
+          "excerpt": "…invoice classification code shall be assigned under Section 13.6. The code shall appear beside the",
+          "status": "Not found",
+          "explanation": "No heading numbered 13.6 was detected in this document. The heading may have been missed; this is a potential error."
+        }
+      },
+      "matching_reason": {
+        "category": "broken_reference",
+        "exact_identity": "13.6",
+        "page": 2,
+        "section": "2.6",
+        "expected_quote": "The invoice classification code shall be assigned under Section 13.6.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "BR03",
+      "prediction": {
+        "id": "P003",
+        "category": "broken_reference",
+        "identity": "14.2",
+        "page": 3,
+        "excerpt": "…ccess-register review shall follow the procedure in Section 14.2. The review entry shall identify the",
+        "raw": {
+          "number": "14.2",
+          "text": "Section 14.2",
+          "page": 3,
+          "excerpt": "…ccess-register review shall follow the procedure in Section 14.2. The review entry shall identify the",
+          "status": "Not found",
+          "explanation": "No heading numbered 14.2 was detected in this document. The heading may have been missed; this is a potential error."
+        }
+      },
+      "matching_reason": {
+        "category": "broken_reference",
+        "exact_identity": "14.2",
+        "page": 3,
+        "section": "3.6",
+        "expected_quote": "The access-register review shall follow the procedure in Section 14.2.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "BR04",
+      "prediction": {
+        "id": "P004",
+        "category": "broken_reference",
+        "identity": "15.4",
+        "page": 4,
+        "excerpt": "The change-request review sequence is set out in Section 15.4. Every proposed change shall state the",
+        "raw": {
+          "number": "15.4",
+          "text": "Section 15.4",
+          "page": 4,
+          "excerpt": "The change-request review sequence is set out in Section 15.4. Every proposed change shall state the",
+          "status": "Not found",
+          "explanation": "No heading numbered 15.4 was detected in this document. The heading may have been missed; this is a potential error."
+        }
+      },
+      "matching_reason": {
+        "category": "broken_reference",
+        "exact_identity": "15.4",
+        "page": 4,
+        "section": "4.6",
+        "expected_quote": "The change-request review sequence is set out in Section 15.4.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "BR05",
+      "prediction": {
+        "id": "P005",
+        "category": "broken_reference",
+        "identity": "16.9",
+        "page": 5,
+        "excerpt": "…ermination-dispute referral process is specified in Section 16.9. A dispute entry shall identify the",
+        "raw": {
+          "number": "16.9",
+          "text": "Section 16.9",
+          "page": 5,
+          "excerpt": "…ermination-dispute referral process is specified in Section 16.9. A dispute entry shall identify the",
+          "status": "Not found",
+          "explanation": "No heading numbered 16.9 was detected in this document. The heading may have been missed; this is a potential error."
+        }
+      },
+      "matching_reason": {
+        "category": "broken_reference",
+        "exact_identity": "16.9",
+        "page": 5,
+        "section": "5.6",
+        "expected_quote": "The termination-dispute referral process is specified in Section 16.9.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "BR06",
+      "prediction": {
+        "id": "P006",
+        "category": "broken_reference",
+        "identity": "17.3",
+        "page": 6,
+        "excerpt": "in Section 17.3.",
+        "raw": {
+          "number": "17.3",
+          "text": "Section 17.3",
+          "page": 6,
+          "excerpt": "in Section 17.3.",
+          "status": "Not found",
+          "explanation": "No heading numbered 17.3 was detected in this document. The heading may have been missed; this is a potential error."
+        }
+      },
+      "matching_reason": {
+        "category": "broken_reference",
+        "exact_identity": "17.3",
+        "page": 6,
+        "section": "6.6",
+        "expected_quote": "The document-service protocol for court correspondence is stated in Section 17.3.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "UT01",
+      "prediction": {
+        "id": "P007",
+        "category": "undefined_term",
+        "identity": "Delivery Window",
+        "page": 1,
+        "excerpt": "The Supplier shall include the Delivery Window in each monthly service schedule. The schedule shall be",
+        "raw": {
+          "term": "Delivery Window",
+          "page": 1,
+          "excerpt": "The Supplier shall include the Delivery Window in each monthly service schedule. The schedule shall be",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "matching_reason": {
+        "category": "undefined_term",
+        "exact_identity": "Delivery Window",
+        "page": 1,
+        "section": "1.4",
+        "expected_quote": "The Supplier shall include the Delivery Window in each monthly service schedule.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "UT02",
+      "prediction": {
+        "id": "P010",
+        "category": "undefined_term",
+        "identity": "Payment Reserve",
+        "page": 2,
+        "excerpt": "The Customer shall record the Payment Reserve in its monthly reconciliation entry. The entry shall",
+        "raw": {
+          "term": "Payment Reserve",
+          "page": 2,
+          "excerpt": "The Customer shall record the Payment Reserve in its monthly reconciliation entry. The entry shall",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "matching_reason": {
+        "category": "undefined_term",
+        "exact_identity": "Payment Reserve",
+        "page": 2,
+        "section": "2.5",
+        "expected_quote": "The Customer shall record the Payment Reserve in its monthly reconciliation entry.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "UT03",
+      "prediction": {
+        "id": "P011",
+        "category": "undefined_term",
+        "identity": "Security Baseline",
+        "page": 3,
+        "excerpt": "The Supplier shall record the Security Baseline in the access register before enabling a user account.",
+        "raw": {
+          "term": "Security Baseline",
+          "page": 3,
+          "excerpt": "The Supplier shall record the Security Baseline in the access register before enabling a user account.",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "matching_reason": {
+        "category": "undefined_term",
+        "exact_identity": "Security Baseline",
+        "page": 3,
+        "section": "3.3",
+        "expected_quote": "The Supplier shall record the Security Baseline in the access register before enabling a user account.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "UT04",
+      "prediction": {
+        "id": "P013",
+        "category": "undefined_term",
+        "identity": "Service Credit",
+        "page": 4,
+        "excerpt": "The Supplier shall show the Service Credit as a separate item in the monthly performance report. The",
+        "raw": {
+          "term": "Service Credit",
+          "page": 4,
+          "excerpt": "The Supplier shall show the Service Credit as a separate item in the monthly performance report. The",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "matching_reason": {
+        "category": "undefined_term",
+        "exact_identity": "Service Credit",
+        "page": 4,
+        "section": "4.3",
+        "expected_quote": "The Supplier shall show the Service Credit as a separate item in the monthly performance report.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    },
+    {
+      "issue_id": "UT05",
+      "prediction": {
+        "id": "P014",
+        "category": "undefined_term",
+        "identity": "Exit Package",
+        "page": 5,
+        "excerpt": "The Supplier shall deliver the Exit Package to the Customer within 7 calendar days after termination.",
+        "raw": {
+          "term": "Exit Package",
+          "page": 5,
+          "excerpt": "The Supplier shall deliver the Exit Package to the Customer within 7 calendar days after termination.",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "matching_reason": {
+        "category": "undefined_term",
+        "exact_identity": "Exit Package",
+        "page": 5,
+        "section": "5.3",
+        "expected_quote": "The Supplier shall deliver the Exit Package to the Customer within 7 calendar days after termination.",
+        "criterion": "Same category and exact identifier; a uniquely located source mention is inside the ground-truth quote on the same page and section."
+      }
+    }
+  ],
+  "missed_issues": [],
+  "unmatched_predictions": [
+    {
+      "prediction": {
+        "id": "P008",
+        "category": "undefined_term",
+        "identity": "Business Days",
+        "page": 2,
+        "excerpt": "…d in the shared ticket queue within two Business Days of transfer. A bank reference",
+        "raw": {
+          "term": "Business Days",
+          "page": 2,
+          "excerpt": "…d in the shared ticket queue within two Business Days of transfer. A bank reference",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "source_locations": [
+        {
+          "section": "2.1",
+          "page": 2,
+          "start": 454,
+          "end": 467
+        }
+      ],
+      "reason": "No ground-truth issue matches this category, exact identifier, page, section, and supporting source mention.",
+      "candidate_issue_ids": [],
+      "duplicate_of_prediction_ids": []
+    },
+    {
+      "prediction": {
+        "id": "P009",
+        "category": "undefined_term",
+        "identity": "Business Days",
+        "page": 2,
+        "excerpt": "…sponding withholding record within five Business Days after payment. This provision",
+        "raw": {
+          "term": "Business Days",
+          "page": 2,
+          "excerpt": "…sponding withholding record within five Business Days after payment. This provision",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "source_locations": [
+        {
+          "section": "2.4",
+          "page": 2,
+          "start": 419,
+          "end": 432
+        }
+      ],
+      "reason": "No ground-truth issue matches this category, exact identifier, page, section, and supporting source mention.",
+      "candidate_issue_ids": [],
+      "duplicate_of_prediction_ids": []
+    },
+    {
+      "prediction": {
+        "id": "P012",
+        "category": "undefined_term",
+        "identity": "Business Days",
+        "page": 3,
+        "excerpt": "…ier shall provide that copy within five Business Days. The copy shall omit authentication secrets and",
+        "raw": {
+          "term": "Business Days",
+          "page": 3,
+          "excerpt": "…ier shall provide that copy within five Business Days. The copy shall omit authentication secrets and",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "source_locations": [
+        {
+          "section": "3.6",
+          "page": 3,
+          "start": 385,
+          "end": 398
+        }
+      ],
+      "reason": "No ground-truth issue matches this category, exact identifier, page, section, and supporting source mention.",
+      "candidate_issue_ids": [],
+      "duplicate_of_prediction_ids": []
+    },
+    {
+      "prediction": {
+        "id": "P015",
+        "category": "undefined_term",
+        "identity": "Business Days",
+        "page": 5,
+        "excerpt": "…stomer shall confirm receipt within two Business Days after the export entry is posted. A failed",
+        "raw": {
+          "term": "Business Days",
+          "page": 5,
+          "excerpt": "…stomer shall confirm receipt within two Business Days after the export entry is posted. A failed",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "source_locations": [
+        {
+          "section": "5.3",
+          "page": 5,
+          "start": 306,
+          "end": 319
+        }
+      ],
+      "reason": "No ground-truth issue matches this category, exact identifier, page, section, and supporting source mention.",
+      "candidate_issue_ids": [],
+      "duplicate_of_prediction_ids": []
+    },
+    {
+      "prediction": {
+        "id": "P016",
+        "category": "undefined_term",
+        "identity": "Business Days",
+        "page": 5,
+        "excerpt": "…s clause shall last no longer than five Business Days. The Supplier shall then",
+        "raw": {
+          "term": "Business Days",
+          "page": 5,
+          "excerpt": "…s clause shall last no longer than five Business Days. The Supplier shall then",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "source_locations": [
+        {
+          "section": "5.4",
+          "page": 5,
+          "start": 333,
+          "end": 346
+        }
+      ],
+      "reason": "No ground-truth issue matches this category, exact identifier, page, section, and supporting source mention.",
+      "candidate_issue_ids": [],
+      "duplicate_of_prediction_ids": []
+    },
+    {
+      "prediction": {
+        "id": "P017",
+        "category": "undefined_term",
+        "identity": "Business Days",
+        "page": 5,
+        "excerpt": "…deliver the requested copy within five Business Days. Delivering a copy does not",
+        "raw": {
+          "term": "Business Days",
+          "page": 5,
+          "excerpt": "…deliver the requested copy within five Business Days. Delivering a copy does not",
+          "status": "Definition not found",
+          "explanation": "Potential issue: no matching definition was detected. A definition may have been missed."
+        }
+      },
+      "source_locations": [
+        {
+          "section": "5.5",
+          "page": 5,
+          "start": 431,
+          "end": 444
+        }
+      ],
+      "reason": "No ground-truth issue matches this category, exact identifier, page, section, and supporting source mention.",
+      "candidate_issue_ids": [],
+      "duplicate_of_prediction_ids": []
+    }
+  ],
+  "not_evaluated_issues": [
+    {
+      "id": "CT01",
+      "category": "contradiction",
+      "description": "Conflicting invoice due dates",
+      "sections": [
+        "2.1",
+        "6.2"
+      ],
+      "evidence": [
+        {
+          "section": "2.1",
+          "quote": "The due date for every undisputed monthly invoice is 10 calendar days after receipt.",
+          "page": 2
+        },
+        {
+          "section": "6.2",
+          "quote": "The due date for every undisputed monthly invoice is 30 calendar days after receipt.",
+          "page": 6
+        }
+      ],
+      "explanation": "The same undisputed monthly invoice and same receipt event have incompatible due dates. The amounts are not alternative periods or minimum response times. Neither clause is conditional, and clause order gives no priority."
+    },
+    {
+      "id": "CT02",
+      "category": "contradiction",
+      "description": "Conflicting exclusive fee currencies",
+      "sections": [
+        "2.3",
+        "6.3"
+      ],
+      "evidence": [
+        {
+          "section": "2.3",
+          "quote": "The monthly service fee is USD 2400 and shall be paid exclusively in USD.",
+          "page": 2
+        },
+        {
+          "section": "6.3",
+          "quote": "The monthly service fee is EUR 2400 and shall be paid exclusively in EUR.",
+          "page": 6
+        }
+      ],
+      "explanation": "The identical monthly service fee must be paid exclusively in two different currencies. No currency option, conversion mechanism, or alternative service is offered. Count the resulting currency/denomination conflict as one issue."
+    },
+    {
+      "id": "CT03",
+      "category": "contradiction",
+      "description": "Deletion conflicts with mandatory retention",
+      "sections": [
+        "3.1",
+        "5.5"
+      ],
+      "evidence": [
+        {
+          "section": "3.1",
+          "quote": "The Supplier shall permanently delete every Customer record 30 calendar days after termination.",
+          "page": 3
+        },
+        {
+          "section": "5.5",
+          "quote": "The Supplier shall retain every Customer record until 90 calendar days after termination before deleting it.",
+          "page": 5
+        }
+      ],
+      "explanation": "Both clauses cover every Customer record, including backups. Permanent deletion at day 30 cannot coexist with retaining those records until day 90. The clauses do not concern different record classes."
+    },
+    {
+      "id": "CT04",
+      "category": "contradiction",
+      "description": "Subcontracting prohibited and required",
+      "sections": [
+        "4.1",
+        "4.2"
+      ],
+      "evidence": [
+        {
+          "section": "4.1",
+          "quote": "The Supplier shall not delegate any part of the services to a subcontractor.",
+          "page": 4
+        },
+        {
+          "section": "4.2",
+          "quote": "The Supplier shall delegate operation of the shared ticket queue to a subcontractor throughout the term.",
+          "page": 4
+        }
+      ],
+      "explanation": "Ticket-queue operation is expressly part of the services. A blanket ban on subcontracting conflicts with mandatory subcontracting of that same service. No exception or consent-based override is provided."
+    },
+    {
+      "id": "CT05",
+      "category": "contradiction",
+      "description": "Conflicting termination notice periods",
+      "sections": [
+        "5.1",
+        "6.4"
+      ],
+      "evidence": [
+        {
+          "section": "5.1",
+          "quote": "For termination by the Customer without cause, the required notice period is exactly 60 calendar days.",
+          "page": 5
+        },
+        {
+          "section": "6.4",
+          "quote": "For termination by the Customer without cause, the required notice period is exactly 15 calendar days.",
+          "page": 6
+        }
+      ],
+      "explanation": "The same party, termination type, and agreement have two mutually exclusive exact notice periods. Unlike competing minimum periods, both cannot be satisfied at once. Neither clause concerns termination for breach."
+    },
+    {
+      "id": "AM01",
+      "category": "ambiguity",
+      "description": "Subjective acceptance standard",
+      "sections": [
+        "1.5"
+      ],
+      "evidence": [
+        {
+          "section": "1.5",
+          "quote": "The Customer may reject a deliverable if it is not commercially satisfactory.",
+          "page": 1
+        }
+      ],
+      "explanation": "Commercial satisfaction determines acceptance but has no stated benchmark, measurement, or decision criteria. Fixed inventory-summary fields do not establish this discretionary acceptance standard. Grade the uncertainty about this criterion as one issue."
+    },
+    {
+      "id": "AM02",
+      "category": "ambiguity",
+      "description": "Unspecified priority response timeframe",
+      "sections": [
+        "3.4"
+      ],
+      "evidence": [
+        {
+          "section": "3.4",
+          "quote": "The Supplier shall respond to priority support requests promptly.",
+          "page": 3
+        }
+      ],
+      "explanation": "Priority requests have an objective outage definition, but promptly provides no measurable response timeframe. Other time limits govern different actions and do not supply a response deadline for priority tickets."
+    },
+    {
+      "id": "AM03",
+      "category": "ambiguity",
+      "description": "Unbounded reasonableness standard for expenses",
+      "sections": [
+        "4.4"
+      ],
+      "evidence": [
+        {
+          "section": "4.4",
+          "quote": "The Customer shall reimburse reasonable transition expenses.",
+          "page": 4
+        }
+      ],
+      "explanation": "Receipts document spending, but no cap, rate, permitted cost classes, or approval criterion determines what counts as reasonable transition expenses. The concern is the reimbursement standard, not a conflict with the separate fixed monthly fee."
+    },
+    {
+      "id": "AM04",
+      "category": "ambiguity",
+      "description": "Undefined material-change threshold for suspension",
+      "sections": [
+        "5.4"
+      ],
+      "evidence": [
+        {
+          "section": "5.4",
+          "quote": "The Supplier may suspend the services if operating conditions change materially.",
+          "page": 5
+        }
+      ],
+      "explanation": "Neither the relevant operating conditions nor a material-change threshold is specified. Notice timing and a five-day suspension cap do not define when the suspension right arises. Grade this trigger uncertainty as one issue."
+    }
+  ],
+  "provenance": {
+    "benchmark": "fictional-commercial-services-v1",
+    "benchmark_version": 1,
+    "pdf_sha256": "99a9153c692284744f319030309565a37388175d93a4c9c1b319b2392d76ce4c",
+    "answer_key_sha256": "fdd0519c93aa60a7dd0547bc91b99049fde22d4c9ed9dea96a605b3cfc6d5206",
+    "pipeline": "main.analyze_document (unchanged production function)",
+    "code_sha256": {
+      "main.py": "cfb94e6ce6a108e0f5768d41e6aa33c208139bf18b5e9be6e6a73ecf4442cc85",
+      "detection.py": "63f3ca0753397d607e4a5571d509b00429914aa56bdb59ef7296ff013dbd2550",
+      "terms.py": "71ac18614bb8cd4b71738c054d6ada2d9e70423025599bc23977e1aea4097e32",
+      "benchmark/build.py": "1e7d731029d8bbc473e6cb1604b7cd0564314a2ea5ec971b31dc6bf654d4ecb7",
+      "benchmark/evaluate.py": "99abf2eb91c355656a707633452bde623d88ee5ab0a1fad6184b8c9077daf650"
+    },
+    "python_version": "3.13.1",
+    "pymupdf_version": "1.28.2"
+  },
+  "pipeline_warnings": {
+    "references": null,
+    "terms": null
+  }
+}
