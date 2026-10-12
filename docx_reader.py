@@ -8,6 +8,8 @@ from docx.text.paragraph import Paragraph
 
 MAX_EXPANDED_BYTES = 50 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 2000
+MAX_TEXT_BYTES = 2 * 1024 * 1024
+MAX_LOCATIONS = 10000
 WORD_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'
 
 
@@ -58,17 +60,23 @@ def extract_docx(contents):
     try:
         document = Document(BytesIO(contents))
         locations = []
+        text_bytes = 0
 
         def walk(container, prefix='docx', label='', depth=0):
+            nonlocal text_bytes
             if depth > 10:
                 raise DocxError('This DOCX contains tables nested too deeply to process safely.')
             paragraph_number = table_number = 0
             for block in container.iter_inner_content():
                 if isinstance(block, Paragraph):
                     paragraph_number += 1
+                    text = block.text
+                    text_bytes += len(text.encode('utf-8'))
+                    if text_bytes > MAX_TEXT_BYTES or len(locations) >= MAX_LOCATIONS:
+                        raise DocxError('This DOCX exceeds the 2 MB extracted-text or 10000-location processing limit. Nothing was truncated; please use a smaller document.')
                     locations.append({'location_id': f'{prefix}-p{paragraph_number}',
                                       'location_label': f'{label}Paragraph {paragraph_number}',
-                                      'text': block.text})
+                                      'text': text})
                 else:
                     table_number += 1
                     table_id = f'{prefix}-t{table_number}'

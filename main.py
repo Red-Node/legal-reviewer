@@ -6,6 +6,7 @@ import pymupdf
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from ai_reviewer import (DEMO_CONTRACT_TEXT, ReviewError, format_document_pages,
                          get_real_review_settings, is_public_demo_only,
@@ -13,11 +14,47 @@ from ai_reviewer import (DEMO_CONTRACT_TEXT, ReviewError, format_document_pages,
 
 from detection import detect_sections_and_references, validate_references
 from terms import detect_terms, validate_terms
-from docx_reader import DocxError, extract_docx, located_results
+from docx_reader import DocxError, MAX_TEXT_BYTES, extract_docx, located_results
 
 app = FastAPI(title="Legal Reviewer")
 BASE_DIR = Path(__file__).resolve().parent
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB, matching the browser's limit.
+MAX_REQUEST_BYTES = MAX_FILE_SIZE + 64 * 1024  # Bounded multipart/header overhead.
+MAX_PDF_PAGES = 500
+# Enforce a streamed wire-body limit BEFORE FastAPI parses/spools multipart files.
+# Starlette also checks actual bytes when Content-Length is absent or misleading.
+app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_REQUEST_BYTES)
+
+
+class BrowserSecurityHeaders:
+    """Compatible response headers; no CSP, script restrictions, or clipboard block."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        async def send_headers(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                present = {name.lower() for name, _ in headers}
+                defaults = {
+                    b"x-content-type-options": b"nosniff",
+                    b"x-frame-options": b"DENY",
+                    b"referrer-policy": b"no-referrer",
+                    b"permissions-policy": b"camera=(), microphone=(), geolocation=()",
+                    b"cache-control": b"no-store",
+                }
+                headers.extend((name, value) for name, value in defaults.items() if name not in present)
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_headers)
+
+
+# Outer user middleware also covers request-limit responses and handled errors.
+app.add_middleware(BrowserSecurityHeaders)
 
 
 @app.get("/health")
@@ -185,10 +222,16 @@ def analyze_document(file: UploadFile | None = File(default=None), response: Res
                     if document.needs_pass:
                         raise HTTPException(status_code=400, detail="This PDF is password protected. Please upload an unlocked copy.")
 
-                    pages = [
-                        {"number": number, "text": page.get_text("text", sort=True)}
-                        for number, page in enumerate(document, start=1)
-                    ]
+                    if document.page_count > MAX_PDF_PAGES:
+                        raise HTTPException(status_code=413, detail="This PDF exceeds the 500-page processing limit. Please use a smaller document.")
+                    pages = []
+                    text_bytes = 0
+                    for number, page in enumerate(document, start=1):
+                        text = page.get_text("text", sort=True)
+                        text_bytes += len(text.encode("utf-8"))
+                        if text_bytes > MAX_TEXT_BYTES:
+                            raise HTTPException(status_code=413, detail="The extracted document text exceeds the 2 MB processing limit. Nothing was truncated; please use a smaller document.")
+                        pages.append({"number": number, "text": text})
             except (RuntimeError, ValueError):
                 raise HTTPException(status_code=400, detail="This PDF is invalid or damaged and could not be read.") from None
 

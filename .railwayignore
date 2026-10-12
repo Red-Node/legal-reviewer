@@ -9,3 +9,9 @@ venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Local-only benchmark captures/reports and Finder metadata.
+.DS_Store
+benchmark/results/real_ai_runs/
+benchmark/results/ai_evaluation_*
+benchmark/results/combined_evaluation_*

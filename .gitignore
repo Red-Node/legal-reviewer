@@ -227,3 +227,6 @@ benchmark/results/real_ai_runs/
 # Local evaluation reports derived from paid benchmark captures.
 benchmark/results/ai_evaluation_*
 benchmark/results/combined_evaluation_*
+
+# Finder metadata at any directory level.
+.DS_Store
