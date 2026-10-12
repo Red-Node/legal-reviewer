@@ -126,6 +126,10 @@
     .verified { background:#eaf4ee; color:#236443; }
     .verification_failed { background:#fff0ef; color:#8f3630; }
     .validation-warning { padding:12px 16px; border:1px solid #eedfba; background:#fff8e9; color:#775523; border-radius:8px; font-size:12px; margin:12px 0; }
+    .analysis-limitations h3 { display:flex; align-items:center; gap:8px; margin:0 0 8px; font-size:13px; font-weight:650; }
+    .analysis-limitations ul { margin:0; padding-left:20px; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+    .analysis-limitations li { padding-left:3px; }
+    .analysis-limitations li + li { margin-top:8px; }
     #review-empty,#filter-empty { background:#f7f9fc; border:1px dashed #cdd7e6; padding:24px; border-radius:8px; color:var(--muted); text-align:center; }
     .finding-editor { padding:16px; background:#f5f7fc; border:1px solid #dce4f1; border-radius:8px; margin-top:16px; }
     label { display:block; font-size:12px; font-weight:650; margin-bottom:8px; }
@@ -216,7 +220,7 @@
           <div class="panel-header"><h2 id="review-heading" tabindex="-1">Review Findings</h2><span class="hint">You make the final call</span></div>
           <div id="findings-scroll" class="findings-scroll" tabindex="0" aria-label="Scrollable findings panel">
             <p class="hint">Inspect the source, then accept or reject. Verified quotes do not confirm a legal interpretation.</p>
-            <p id="check-warning" class="validation-warning" role="status" hidden></p>
+            <div id="check-warning" class="validation-warning analysis-limitations" role="status" hidden></div>
             <p id="review-counts" role="status" aria-live="polite"></p>
             <div class="filters" role="group" aria-label="Filter findings by human decision">
               <button id="filter-all" type="button" aria-pressed="true">All</button>
@@ -1117,8 +1121,24 @@
         renderReviewDashboard();
         if (!docx) showRealControls(currentPages);
         const checkWarning = document.getElementById("check-warning");
-        checkWarning.textContent = [data.validation_warning, data.term_validation_warning].filter(Boolean).join(" ");
-        checkWarning.hidden = !checkWarning.textContent;
+        // Keep independent backend messages intact; show identical warnings once.
+        const warnings = [...new Set([data.validation_warning, data.term_validation_warning].filter(Boolean))];
+        checkWarning.replaceChildren();
+        checkWarning.hidden = warnings.length === 0;
+        if (warnings.length) {
+          const heading = document.createElement("h3");
+          const icon = document.createElement("span");
+          icon.textContent = "⚠";
+          icon.setAttribute("aria-hidden", "true");
+          heading.append(icon, document.createTextNode("Analysis limitations"));
+          const list = document.createElement("ul");
+          for (const warning of warnings) {
+            const item = document.createElement("li");
+            item.textContent = warning;
+            list.append(item);
+          }
+          checkWarning.append(heading, list);
+        }
         document.getElementById("ai-options").open = !docx && reviewState.counts().total === 0;
         setStage("review", reviewState.counts().total ? "Inspect the evidence and make a decision on each finding." :
           docx ? "No findings from the current rules. Read the source and check any validation warnings." : "No rule-based findings. Optional AI review is under AI review options.");

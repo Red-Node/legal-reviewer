@@ -196,6 +196,44 @@ await uploadFile();
 assert.equal(elements.get('check-warning').hidden,false);
 assert(elements.get('check-warning').textContent.includes('No section headings'));
 assert(elements.get('check-warning').textContent.includes('No definitions'));
+const box=elements.get('check-warning');
+assert.equal(box.children[0].tagName,'h3');
+assert(box.children[0].textContent.includes('Analysis limitations'));
+const list=box.children[1];
+assert.equal(list.tagName,'ul');
+assert.deepEqual(list.children.map(item=>item.tagName),['li','li']);
+assert.equal(list.children[0].textContent,upload.validation_warning);
+assert.equal(list.children[1].textContent,upload.term_validation_warning);
+""",ui=True)
+
+    def test_identical_analysis_warnings_combined_without_rewording(self):
+        self.run_js("""
+upload.validation_warning=upload.term_validation_warning='Validation unreliable; read the source.';
+await uploadFile();
+const list=elements.get('check-warning').children[1];
+assert.equal(list.children.length,1);
+assert.equal(list.children[0].textContent,upload.validation_warning);
+""",ui=True)
+
+    def test_warning_markup_remains_literal_text(self):
+        self.run_js("""
+upload.validation_warning='<img src=x onerror=alert(1)> & warning';
+await uploadFile();
+const item=elements.get('check-warning').children[1].children[0];
+assert.equal(item.tagName,'li');
+assert.equal(item.textContent,upload.validation_warning);
+assert.equal(item.children.length,0);
+assert(!html.includes('innerHTML'));
+""",ui=True)
+
+    def test_new_analysis_without_warnings_clears_list(self):
+        self.run_js("""
+upload.validation_warning='Validation unreliable.';
+await uploadFile();
+upload.validation_warning=null; upload.term_validation_warning=null;
+await uploadFile();
+assert.equal(elements.get('check-warning').hidden,true);
+assert.equal(elements.get('check-warning').children.length,0);
 """,ui=True)
 
     def test_empty_pdf_offers_ai_options_without_running_ai(self):
