@@ -12,14 +12,15 @@
         category: "Potential broken reference",
         title: `Section ${reference.number} was not found`,
         explanation: reference.explanation,
-        evidence: [{quote: reference.excerpt, ...ruleLocation(reference), verificationStatus: "not_applicable"}],
+        evidence: [{quote: reference.excerpt, referenceText: reference.text, referenceNumber: reference.number,
+          displayExcerpt: true, ...ruleLocation(reference), verificationStatus: "not_applicable"}],
         verificationStatus: "not_applicable",
       })),
       ...document.potentially_undefined_terms.map(term => ({
         category: "Potentially undefined term",
         title: `Definition not found for ${term.term}`,
         explanation: term.explanation,
-        evidence: [{quote: term.excerpt, ...ruleLocation(term), verificationStatus: "not_applicable"}],
+        evidence: [{quote: term.excerpt, displayExcerpt: true, ...ruleLocation(term), verificationStatus: "not_applicable"}],
         verificationStatus: "not_applicable",
       })),
     ];
@@ -77,6 +78,34 @@
     return [...source.normalized.matchAll(new RegExp(`(?=${pattern})`, "gu"))].map(match => ({
       start: source.starts[match.index], end: source.ends[match.index + target.length - 1],
     }));
+  }
+
+  // Navigation only. AI quotes always retain exact matching; this never verifies evidence.
+  function findEvidenceMatches(text, evidence, source) {
+    const exact = findQuoteMatches(text, evidence.quote);
+    if (source !== "rules" || !evidence.displayExcerpt) return exact;
+
+    // The detectors add edge ellipses after slicing a display excerpt, sometimes
+    // through a word. Drop those partial edge words, never alter interior text.
+    let context = evidence.quote.trim();
+    const leading = /^(?:…|\.{3})/.test(context);
+    const trailing = /(?:…|\.{3})$/.test(context);
+    if (leading) context = context.replace(/^(?:…|\.{3})\s*\S*\s*/, "");
+    if (trailing) context = context.replace(/\s*\S*?(?:…|\.{3})$/, "");
+    const distinctive = context.length >= 40 && context.split(/\s+/).length >= 6;
+    const contexts = exact.length ? exact : (distinctive ? findQuoteMatches(text, context) : []);
+
+    // Original detector reference text + target identifier, not a guessed phrase
+    // extracted from the finding title. Return every plausible source occurrence.
+    if (typeof evidence.referenceText === "string" &&
+        /^[1-9]\d*(?:\.\d+)*$/.test(evidence.referenceNumber || "")) {
+      const references = findQuoteMatches(text, evidence.referenceText).filter(match =>
+        !/^(?:\.\d|[\p{L}\p{N}_]|\()/u.test(text.slice(match.end)));
+      const contextual = references.filter(reference => contexts.some(context =>
+        reference.start >= context.start && reference.end <= context.end));
+      return contextual.length ? contextual : references;
+    }
+    return contexts;
   }
 
   function buildCounselLetter(findings, pages = []) {
@@ -207,7 +236,7 @@
     };
   }
 
-  const api = {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, buildCounselLetter, createCounselDraft};
+  const api = {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, findEvidenceMatches, buildCounselLetter, createCounselDraft};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ReviewDashboard = api;
 })(typeof window !== "undefined" ? window : globalThis);

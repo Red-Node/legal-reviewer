@@ -58,7 +58,8 @@ are unsupported.
 
 1. Upload a fictional PDF or DOCX and click **Analyze Document**.
 2. Read the extracted text and rule-based results, including validation warnings.
-3. For the synthetic demo PDF, explicitly click **Analyze with AI (Demo)**.
+3. Expand **AI review options**, then explicitly click **Analyze with AI (Demo)**
+   for the synthetic demo PDF.
    The demo returns three predefined findings, including a deliberately invented
    quotation. These are demonstration results, **not benchmark detection**.
 4. Examine each finding and its source evidence. **View in document** highlights
@@ -80,7 +81,8 @@ or included in the draft; evidence status and human decision remain separate.
 
 1. Open the [public demo](https://legal-reviewer-production.up.railway.app).
 2. Click **Download the synthetic demo contract** and upload the downloaded PDF.
-3. Click **Analyze Document**, then **Analyze with AI (Demo)**.
+3. Click **Analyze Document**, then **Analyze with AI (Demo)** under **AI review
+   options**. Expand a finding to read its supporting quotations.
 4. Check the verified payment/notice quotations and the intentionally failed
    invented quotation. Accept should be unavailable for the failed finding.
 5. Edit and accept one eligible finding, then generate a counsel draft. Confirm
@@ -203,7 +205,7 @@ python -m unittest test_security -v
 python -m pip check
 ```
 
-The Milestone 9A suite has **383 passing offline tests**, including PDF/DOCX,
+The current suite has **427 passing offline tests**, including PDF/DOCX,
 mocked Claude responses, evidence checks, browser-state workflows, benchmark
 integrity, and focused security regressions. Tests use synthetic documents and
 mocks; no paid requests are needed. Tests that inspect saved real captures skip
@@ -378,3 +380,65 @@ requirements. These are proposals, not implemented features.
 Detailed historical setup and testing instructions are preserved in
 [Milestone notes](docs/MILESTONE_NOTES.md); this README describes the current
 hackathon submission.
+
+
+## Review workspace redesign (Milestone 9B-UI)
+
+The reading-first interface keeps the source on the left and findings on the
+right on desktop, with independently scrollable panels. Below 900px the panels
+stack; no findings or source text are discarded. The privacy/prototype notice,
+selected filename and Upload → Analyze → Review → Draft progression remain clear.
+
+Drop one PDF/DOCX into the upload area or use the native file chooser. Dropping
+a file selects it only; Analyze Document is still an explicit action. Invalid
+extensions, legacy .doc and files over 10 MB produce helpful errors. Server
+validation, public demo gates and all endpoint contracts are unchanged.
+
+Finding cards start compact. Choose **Read explanation & source quotes** to
+expand them and use **View in document** beside any supporting quote. Evidence
+status, source type and human decision have separate text labels; color alone
+is never the only indicator. Keyboard focus follows disclosure/edit/decision
+actions, and reduced-motion preferences are respected.
+
+**View in document** scrolls only the document panel to the first highlighted
+quote, placing its first line about 27.5% below the panel's top. PDF pages and
+DOCX source locations use the same navigation. When several matches exist,
+**Previous match / Next match** cycle through the highlighted regions; the
+message makes clear that the location is not unique. A missing exact quote
+shows a message without moving the document. At the beginning/end of the
+document, scrolling is limited by the available content. Very long quotations
+may need further scrolling to read their remaining lines.
+
+Rule-based excerpts are shortened display text, not necessarily full quotations.
+For broken references, navigation uses the detector's original reference token
+(for example, **Section 16.9**) at its original PDF page or DOCX location. Exact
+excerpt context narrows repeated occurrences when possible; otherwise all
+plausible token matches remain available through the match controls. Other
+shortened rule-based excerpts require a long exact source substring (at least
+40 characters and six words), excluding truncation markers and partial edge
+words. Short or missing text is not guessed. These navigation fallbacks never
+apply to AI quotations and never change evidence verification status.
+
+Use **All / Pending / Accepted / Rejected** to filter the view. Counters always
+reflect the complete review; filtering never changes findings or decisions.
+Empty filters explain how to return to All. Save or cancel an edit before
+switching filters. Detection diagnostics remain accessible under an expandable
+section; unreliable-validation warnings are also shown directly in the panel.
+AI controls are progressive disclosures; opening one does not call Claude.
+
+The separate draft stage reports the number of accepted, eligible findings.
+It still uses the full review, regardless of the selected filter, and preserves
+manual draft edits and outdated warnings. Copy and Download remain explicit.
+There is no added persistence, frontend framework, backend rewrite, benchmark
+change or deployment.
+
+The redesign adds 23 offline interaction/structure tests:
+
+```bash
+python -m unittest test_workspace -v
+python -m unittest -v
+```
+
+System fonts and static inline SVG are used; no external fonts or UI libraries
+are needed. Practical keyboard, contrast, responsive and reduced-motion checks
+are not a formal WCAG conformance certification. DOCX AI remains unavailable.

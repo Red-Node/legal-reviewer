@@ -5,90 +5,254 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Legal Reviewer</title>
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 32px 20px; font-family: system-ui, sans-serif; color: #203047; background: #f3f5f8; }
-    main { max-width: 900px; margin: auto; }
-    h1 { margin-bottom: 8px; }
-    .intro { color: #526078; margin-bottom: 24px; }
-    form, .page, .detections { background: white; border: 1px solid #d6dde7; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
-    label { display: block; font-weight: 600; margin-bottom: 12px; }
-    input { display: block; max-width: 100%; font: inherit; }
-    .hint { color: #526078; font-size: 14px; }
-    button { border: 0; border-radius: 6px; padding: 12px 20px; background: #2457b5; color: white; font: inherit; cursor: pointer; }
-    button:disabled { opacity: 0.6; cursor: wait; }
-    .review-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
-    .review-actions button:disabled { cursor: not-allowed; }
-    .review-actions .reject-button { background: #922020; }
-    .review-actions .pending-button { background: #526078; }
-    #review-findings > li { padding: 16px 0; border-bottom: 1px solid #d6dde7; }
-    .finding-editor { background: #f3f6fa; padding: 16px; border-radius: 6px; }
-    .finding-editor input, .finding-editor textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; margin-bottom: 12px; }
-    .finding-editor textarea { min-height: 100px; }
-    #counsel-letter { width: 100%; min-height: 360px; box-sizing: border-box; padding: 12px; font: inherit; line-height: 1.5; }
-    .page { scroll-margin-top: 20px; }
-    .evidence-target { border: 2px solid #2457b5; }
-    mark { background: #ffe08a; color: #172033; }
-    textarea:focus-visible { outline: 3px solid #7da9f8; outline-offset: 4px; }
-    button:focus-visible, input:focus-visible { outline: 3px solid #7da9f8; outline-offset: 4px; }
-    #error, #ai-error, #real-error { padding: 16px; border-radius: 6px; background: #fce8e8; color: #922020; }
-    .verified { color: #185b35; background: #e7f5ec; }
-    .verification_failed { color: #922020; background: #fce8e8; }
-    .verification-status { display: inline-block; padding: 4px 8px; border-radius: 4px; }
-    .demo-label { font-weight: 600; color: #714d00; }
-    #summary { overflow-wrap: anywhere; }
-    .page h2 { margin-top: 0; font-size: 20px; }
-    .detections h2 { margin-top: 0; font-size: 20px; }
-    .detections li { margin-bottom: 12px; overflow-wrap: anywhere; }
-    .detections li p { margin: 6px 0; }
-    .detections ul { padding-left: 24px; }
-    .validation-warning { padding: 16px; border-radius: 6px; background: #fff3d6; color: #714d00; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 15px/1.6 system-ui, sans-serif; margin-bottom: 0; }
+    :root { --bg:#f6f7f9; --surface:#fff; --ink:#18253b; --muted:#526176; --line:#dfe4eb; --blue:#254fc2; --tint:#edf2ff; --radius:12px; }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+    button,input,textarea,select { font:inherit; }
+    a { color:var(--blue); text-underline-offset:3px; }
+    button { min-height:40px; border:1px solid transparent; border-radius:8px; padding:9px 16px; background:var(--blue); color:white; font-weight:600; cursor:pointer; transition:background .15s; }
+    button:hover { background:#1d3f9e; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    button.secondary { background:white; color:var(--ink); border-color:var(--line); }
+    button.secondary:hover { background:#f0f3f8; }
+    button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible,[tabindex]:focus-visible { outline:3px solid #6086e9; outline-offset:3px; }
+    h1,h2,h3,p { margin:0; }
+    h1 { font-size:18px; letter-spacing:-.5px; }
+    h2 { font-size:20px; letter-spacing:-.4px; }
+    h3 { font-size:16px; line-height:1.45; }
+    .topbar { min-height:72px; padding:16px 32px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:24px; background:white; }
+    .brand { display:flex; align-items:center; gap:12px; flex-shrink:0; }
+    .brand-mark { width:36px; height:36px; display:grid; place-items:center; color:white; background:#182e54; border-radius:9px; font-size:12px; font-weight:750; letter-spacing:.5px; }
+    .brand small { display:block; color:var(--muted); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; }
+    .top-meta { display:flex; align-items:center; gap:16px; min-width:0; }
+    #current-document-name { max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
+    .prototype-pill,.status-badge { display:inline-flex; gap:6px; align-items:center; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:650; background:#f0f3f8; color:#445268; }
+    .prototype-pill { border:1px solid #dfe5ef; }
+    main { max-width:1536px; margin:auto; padding:24px 32px 40px; }
+    .workflow { display:flex; gap:8px; list-style:none; padding:0; margin:0; }
+    .workflow li { display:flex; align-items:center; gap:8px; color:var(--muted); padding:8px 12px; border-radius:8px; font-size:13px; }
+    .workflow li[aria-current="step"] { background:var(--tint); color:#23469f; font-weight:650; }
+    .step-number { width:22px; height:22px; border:1px solid #cbd3df; border-radius:50%; display:grid; place-items:center; font-size:11px; }
+    .workflow li[aria-current="step"] .step-number { background:var(--blue); color:white; border-color:var(--blue); }
+    .workflow-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; }
+    #stage-guidance { color:var(--muted); font-size:13px; text-align:right; }
+    .privacy-notice { margin-bottom:24px; padding:12px 16px; background:#f1f3f7; border:1px solid var(--line); border-radius:8px; color:#445268; font-size:12px; }
+    .privacy-notice strong { color:#27374e; }
+    .upload-intro { margin-bottom:24px; }
+    .eyebrow { color:#586880; font-size:11px; text-transform:uppercase; letter-spacing:1.3px; font-weight:700; margin-bottom:8px; }
+    .upload-intro h2 { font-size:32px; line-height:1.2; letter-spacing:-1px; margin-bottom:12px; }
+    .intro { color:var(--muted); font-size:15px; max-width:600px; }
+    .upload-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:32px; padding:32px; background:white; border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 4px 24px #1b2b4504; }
+    .upload-main { min-width:0; }
+    .drop-zone { position:relative; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:32px 24px; border:1px dashed #b8c6dc; border-radius:10px; background:#fafbfe; min-height:184px; text-align:center; }
+    .drop-zone.drag-over { background:var(--tint); border:2px dashed var(--blue); }
+    .upload-symbol { width:44px; height:44px; color:var(--blue); background:var(--tint); border-radius:10px; display:grid; place-items:center; margin-bottom:12px; }
+    .drop-zone label { font-size:15px; font-weight:650; margin-bottom:4px; }
+    .drop-zone input { max-width:100%; margin-top:16px; color:var(--muted); font-size:12px; }
+    input::file-selector-button { border:1px solid var(--line); border-radius:6px; padding:7px 12px; margin-right:10px; background:white; font:inherit; color:var(--ink); cursor:pointer; }
+    .hint { color:var(--muted); font-size:12px; }
+    #upload-hint { margin-top:12px; }
+    .upload-footer { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:20px; }
+    #selected-filename { overflow-wrap:anywhere; font-size:12px; color:#354761; }
+    .upload-guide { padding:8px 0 8px 24px; border-left:1px solid var(--line); }
+    .upload-guide h3 { margin-bottom:20px; }
+    .guide-item { display:flex; align-items:flex-start; gap:12px; margin-bottom:20px; }
+    .guide-number { color:#586880; background:#f0f3f8; border-radius:6px; width:28px; height:28px; display:grid; place-items:center; flex-shrink:0; font-size:12px; }
+    .guide-item strong { font-size:13px; }
+    .guide-item p { font-size:12px; color:var(--muted); margin-top:3px; }
+    .sample-link { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; }
+    #upload-form.has-document { grid-template-columns:1fr; padding:16px 24px; margin-bottom:20px; }
+    #upload-form.has-document .upload-guide { display:none; }
+    #upload-form.has-document .drop-zone { min-height:0; padding:8px 0; align-items:flex-start; background:transparent; border:0; text-align:left; }
+    #upload-form.has-document .upload-symbol,#upload-form.has-document .drop-zone .hint { display:none; }
+    #upload-form.has-document .drop-zone input { margin-top:8px; }
+    #upload-form.has-document #upload-hint { display:none; }
+    #upload-form.has-document .upload-main { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+    #upload-form.has-document .upload-footer { margin:0; }
+    .status-row { color:#354761; font-size:13px; margin:16px 0; }
+    .status-row:empty { display:none; }
+    #error,#ai-error,#real-error { background:#fff0ef; border:1px solid #f0ceca; color:#892d27; padding:12px 16px; border-radius:8px; margin:12px 0; }
+    .workspace-title { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:24px 0 16px; }
+    #summary { font-size:17px; overflow-wrap:anywhere; }
+    .workspace-subtitle { color:var(--muted); font-size:12px; margin-top:4px; }
+    .workspace-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:24px; align-items:start; }
+    .document-panel,.findings-panel { background:white; border:1px solid var(--line); border-radius:var(--radius); min-width:0; overflow:hidden; }
+    .panel-header { padding:16px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:16px; background:white; }
+    .panel-header h2 { font-size:15px; letter-spacing:0; }
+    .panel-header .hint { font-size:11px; }
+    .document-scroll { overflow:auto; max-height:calc(100vh - 220px); min-height:440px; padding:24px; background:#f4f5f7; }
+    .page { margin-bottom:24px; padding:32px 40px; background:white; border:1px solid #e1e5eb; border-radius:4px; box-shadow:0 2px 8px #19284005; scroll-margin-top:16px; }
+    .page:last-child { margin-bottom:0; }
+    .page h2 { font:600 11px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#65738a; text-transform:uppercase; letter-spacing:.8px; padding-bottom:16px; border-bottom:1px solid #edf0f4; margin-bottom:24px; overflow-wrap:anywhere; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; font:16px/1.85 Georgia,"Times New Roman",serif; margin:0; color:#28354b; }
+    .evidence-target { outline:2px solid #537dd7; outline-offset:-1px; }
+    mark.active-evidence-match { outline:2px solid #254fc2; outline-offset:2px; }
+    .evidence-match-controls { display:flex; align-items:center; gap:8px; padding:8px 24px; border-bottom:1px solid var(--line); background:#f7f9fc; }
+    .evidence-match-controls button { min-height:32px; padding:5px 10px; font-size:12px; }
+    .evidence-match-controls span { font-size:12px; color:var(--muted); }
+    mark { background:#ffeab2; color:#172238; border-bottom:2px solid #ce931d; border-radius:2px; }
+    .document-scroll:focus-visible,.findings-scroll:focus-visible { outline-offset:-3px; }
+    .findings-scroll { overflow:auto; max-height:calc(100vh - 220px); padding:20px; min-height:440px; }
+    #review-counts { font-size:12px; color:var(--muted); padding:12px 0; }
+    #review-decision-status,#document-navigation-status { color:#365b88; font-size:12px; }
+    #document-navigation-status:not(:empty) { padding:12px 24px; background:#eef4ff; border-bottom:1px solid #dce6f6; }
+    .filters { display:flex; gap:4px; padding:4px; background:#f2f4f8; border-radius:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .filters button { flex:1; min-height:36px; padding:6px 8px; color:#526176; background:transparent; font-size:12px; border-radius:6px; }
+    .filters button[aria-pressed="true"] { background:white; color:#213c77; box-shadow:0 1px 4px #14264a14; }
+    #review-findings { list-style:none; padding:0; margin:0; }
+    #review-findings > li { border:1px solid var(--line); border-radius:10px; margin-bottom:12px; padding:16px; overflow-wrap:anywhere; }
+    #review-findings > li h3 { font-size:14px; font-weight:650; margin-bottom:8px; }
+    .finding-source { font-size:11px; color:var(--muted); margin-bottom:12px; }
+    #review-findings li p { margin:8px 0; }
+    #review-findings li ul { list-style:none; padding:0; }
+    #review-findings li ul li { background:#f7f8fa; padding:12px; border-left:3px solid #d6dfef; border-radius:4px; margin-top:12px; }
+    #review-findings li ul p { font:14px/1.7 Georgia,"Times New Roman",serif; }
+    #review-findings li ul button { font-size:11px; background:white; color:var(--blue); border:1px solid #cedaef; padding:5px 10px; min-height:32px; }
+    .review-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+    .review-actions button { padding:6px 10px; min-height:36px; font-size:12px; }
+    .review-actions .accept-button { background:#eaf4ee; color:#236443; border-color:#cfe5d6; }
+    .review-actions .accept-button:hover { background:#d8eddf; }
+    .review-actions .reject-button { background:white; color:#8f3630; border-color:#e5d8d6; }
+    .review-actions .reject-button:hover { background:#fff1ef; }
+    .review-actions .pending-button,.review-actions .edit-button { background:white; color:#526176; border-color:var(--line); }
+    .finding-toggle { width:100%; background:transparent; color:#485d7c; text-align:left; padding:8px 0 0; border-top:1px solid #edf0f5; min-height:32px; font-size:12px; font-weight:500; border-radius:0; }
+    .finding-toggle:hover { background:transparent; color:var(--blue); }
+    .decision-status { display:inline-block; background:#fff3d9; color:#755316; padding:3px 8px; border-radius:5px; font-size:11px; font-weight:650; }
+    .decision-accepted { background:#eaf4ee; color:#236443; }
+    .decision-rejected { background:#f1f2f5; color:#576275; }
+    .verification-status { display:inline-block; padding:3px 8px; border-radius:5px; font:11px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important; background:#f2f4f8; color:#526176; }
+    .verified { background:#eaf4ee; color:#236443; }
+    .verification_failed { background:#fff0ef; color:#8f3630; }
+    .validation-warning { padding:12px 16px; border:1px solid #eedfba; background:#fff8e9; color:#775523; border-radius:8px; font-size:12px; margin:12px 0; }
+    #review-empty,#filter-empty { background:#f7f9fc; border:1px dashed #cdd7e6; padding:24px; border-radius:8px; color:var(--muted); text-align:center; }
+    .finding-editor { padding:16px; background:#f5f7fc; border:1px solid #dce4f1; border-radius:8px; margin-top:16px; }
+    label { display:block; font-size:12px; font-weight:650; margin-bottom:8px; }
+    .finding-editor input,.finding-editor textarea { width:100%; border:1px solid #8292a8; border-radius:6px; padding:10px; font:inherit; margin-bottom:12px; color:var(--ink); background:white; }
+    .finding-editor textarea { min-height:120px; }
+    details { margin-top:16px; }
+    summary { cursor:pointer; color:#4b5e7a; padding:8px 0; font-size:12px; }
+    .check-details { border-top:1px solid var(--line); padding-top:8px; margin-top:24px; }
+    .detections { margin:16px 0; padding:16px; border:1px solid var(--line); border-radius:8px; background:#fff; min-width:0; }
+    .detections h2 { font-size:14px; margin-bottom:12px; }
+    .detections p { margin:8px 0; }
+    .detections ul { padding-left:20px; overflow-wrap:anywhere; }
+    .detections li { margin-bottom:12px; }
+    .demo-label { color:#365b88; font-weight:600; font-size:12px; }
+    .ai-tools { margin-top:20px; padding-top:16px; border-top:1px solid var(--line); }
+    .ai-tools > summary { font-weight:600; }
+    .draft-action { display:flex; justify-content:space-between; align-items:center; gap:24px; background:#edf2fc; border:1px solid #dbe4f4; border-radius:var(--radius); padding:24px; margin-top:24px; }
+    .draft-action h2 { font-size:17px; margin-bottom:4px; }
+    .draft-stage { padding:32px; margin-top:24px; background:white; border:1px solid var(--line); border-radius:var(--radius); }
+    .draft-stage h3 { font-size:24px; letter-spacing:-.6px; }
+    .draft-header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:24px; }
+    #counsel-letter { width:100%; min-height:480px; border:1px solid #8292a8; border-radius:8px; background:#fdfefe; padding:24px; color:#28354b; font:16px/1.8 Georgia,"Times New Roman",serif; resize:vertical; margin:12px 0; }
+    .site-footer { display:flex; justify-content:space-between; gap:16px; color:#586880; font-size:11px; padding-top:24px; margin-top:32px; border-top:1px solid var(--line); }
+    .visually-hidden { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    .visually-hidden:focus { position:fixed; top:8px; left:8px; width:auto; height:auto; clip:auto; padding:12px; background:white; z-index:10; }
+    @media(min-width:1100px) { .upload-layout { max-width:1080px; } .upload-intro { margin-top:32px; } }
+    @media(max-width:900px) { .topbar { padding:16px 20px; } main { padding:20px; } .workspace-grid { grid-template-columns:1fr; } .document-scroll,.findings-scroll { max-height:65vh; min-height:240px; } .top-meta #current-document-name { max-width:150px; } .upload-layout { gap:24px; padding:24px; } }
+    @media(max-width:600px) { .topbar { padding:12px 16px; gap:12px; } main { padding:16px; } .brand small,#current-document-name { display:none; } .top-meta { gap:8px; } .prototype-pill { font-size:10px; } .workflow-bar { align-items:flex-start; flex-direction:column; margin-bottom:16px; } .workflow { width:100%; gap:0; justify-content:space-between; } .workflow li { font-size:11px; padding:8px 4px; gap:4px; } #stage-guidance { text-align:left; } .upload-intro h2 { font-size:26px; } .upload-layout { grid-template-columns:1fr; padding:20px; } .upload-guide { border-left:0; border-top:1px solid var(--line); padding:20px 0 0; } .drop-zone { padding:24px 12px; } .upload-footer { align-items:stretch; flex-direction:column; gap:12px; } #upload-form.has-document .upload-main { flex-direction:column; align-items:stretch; gap:16px; } .page { padding:24px 20px; } .document-scroll { padding:16px; } .panel-header { padding:16px; } .findings-scroll { padding:16px; } .workspace-title { align-items:flex-start; flex-direction:column; } .draft-action { align-items:stretch; flex-direction:column; padding:20px; gap:16px; } .draft-stage { padding:20px; } .draft-header { flex-direction:column; gap:8px; } #counsel-letter { padding:16px; font-size:15px; } .site-footer { flex-direction:column; } .review-actions button,.filters button { min-height:44px; } }
+    @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } * { transition:none !important; scroll-behavior:auto !important; } }
   </style>
 </head>
 <body>
+  <a class="visually-hidden" href="#upload-form">Skip to document upload</a>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">LR</span><div><h1>Legal Reviewer</h1><small>Document review workspace</small></div></div>
+    <div class="top-meta"><span id="current-document-name">No document selected</span><span class="prototype-pill">Prototype · demo available</span></div>
+  </header>
   <main>
-    <h1>Legal Reviewer</h1>
-    <p class="validation-warning" id="prototype-warning"><strong>Prototype — use synthetic or public sample documents only.</strong> Do not upload confidential or personal legal documents. Uploaded text is processed by the server hosting this application. This quality-control tool does not provide legal advice.</p>
-    <p class="intro">Upload a PDF or DOCX to read extracted text with source locations.</p>
-
-    <form id="upload-form">
-      <label for="pdf-file">Choose a PDF or DOCX document</label>
-      <input id="pdf-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-describedby="upload-hint">
-      <p class="hint" id="upload-hint">Maximum size: 10 MB. Use a PDF with selectable text or a Word .docx with text paragraphs/tables. Legacy .doc files are not supported. Uploaded documents are not permanently stored.</p>
-      <p class="hint"><a href="/demo-contract.pdf">Download the synthetic demo contract</a> to test the mock AI review.</p>
-      <button id="analyze-button" type="submit">Analyze Document</button>
+    <div class="workflow-bar">
+      <nav aria-label="Document review progress"><ol class="workflow">
+        <li id="stage-upload" aria-current="step"><span class="step-number" aria-hidden="true">1</span>Upload</li>
+        <li id="stage-analyze"><span class="step-number" aria-hidden="true">2</span>Analyze</li>
+        <li id="stage-review"><span class="step-number" aria-hidden="true">3</span>Review</li>
+        <li id="stage-draft"><span class="step-number" aria-hidden="true">4</span>Draft</li>
+      </ol></nav>
+      <p id="stage-guidance" role="status" aria-live="polite">Start with a fictional or public sample agreement.</p>
+    </div>
+    <p class="privacy-notice" id="prototype-warning"><strong>Prototype — use synthetic or public sample documents only.</strong> Do not upload confidential or personal legal documents. Uploaded text is processed by the server hosting this application. This quality-control tool does not provide legal advice.</p>
+    <div id="upload-intro" class="upload-intro"><p class="eyebrow">A clearer path from agreement to questions</p><h2>A clearer contract review.</h2><p class="intro">Bring the agreement and its potential issues into one workspace. Check the evidence, make your decisions, and prepare questions for counsel.</p></div>
+    <form id="upload-form" class="upload-layout">
+      <div class="upload-main">
+        <div>
+          <div id="drop-zone" class="drop-zone">
+            <div class="upload-symbol" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 3h7l4 4v14H6V3h1Z"/><path d="M14 3v5h5M12 17V11m-3 3 3-3 3 3"/></svg></div>
+            <label for="pdf-file">Choose a PDF or DOCX document</label>
+            <p class="hint">Drag a file here, or browse from your computer.</p>
+            <input id="pdf-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-describedby="upload-hint selected-filename">
+          </div>
+          <p class="hint" id="upload-hint">PDF or DOCX · Maximum size: 10 MB. Use selectable text. Legacy .doc files are not supported. Uploaded documents are not permanently stored.</p>
+        </div>
+        <div class="upload-footer"><p id="selected-filename">No file selected</p><button id="analyze-button" type="submit">Analyze Document</button></div>
+      </div>
+      <aside class="upload-guide" aria-label="How review works">
+        <h3>A review you stay in control of</h3>
+        <div class="guide-item"><span class="guide-number" aria-hidden="true">01</span><div><strong>Start with the source</strong><p>Read extracted text with original PDF pages or explicit DOCX locations.</p></div></div>
+        <div class="guide-item"><span class="guide-number" aria-hidden="true">02</span><div><strong>Make each decision</strong><p>Inspect potential issues and their evidence before accepting or rejecting.</p></div></div>
+        <div class="guide-item"><span class="guide-number" aria-hidden="true">03</span><div><strong>Prepare clear questions</strong><p>Turn only accepted, eligible findings into an editable draft for counsel.</p></div></div>
+        <p class="sample-link">Just exploring? <a href="/demo-contract.pdf">Download the synthetic demo contract</a> for the free AI demonstration.</p>
+      </aside>
     </form>
-
-    <p id="status" role="status" aria-live="polite"></p>
+    <p id="status" class="status-row" role="status" aria-live="polite"></p>
     <p id="error" role="alert" hidden></p>
     <section id="results" aria-label="Extracted document text" hidden>
-      <h2 id="summary"></h2>
+      <div class="workspace-title"><div><p class="eyebrow">Review workspace</p><h2 id="summary"></h2><p class="workspace-subtitle">Source evidence and human decisions, side by side.</p></div><span class="status-badge">Extracted text · not a legal opinion</span></div>
       <p id="docx-notice" class="validation-warning" hidden></p>
-      <section class="detections" aria-labelledby="review-heading">
-        <h2 id="review-heading">Review Findings</h2>
-        <p class="hint">Accept or reject each potential issue explicitly. Evidence verification and human decisions are separate. Verified text does not confirm a legal interpretation.</p>
-        <p class="validation-warning">Decisions and edits are kept only in browser memory and are lost after a page reload or a new upload. Saving edits to an accepted finding returns it to pending. Demo findings are synthetic test results.</p>
-        <p id="review-counts" role="status" aria-live="polite"></p>
-        <p id="review-decision-status" role="status" aria-live="polite"></p>
-        <p id="review-empty">No review findings yet. Existing rule-based checks are shown below; AI findings appear after an explicit AI review.</p>
-        <ul id="review-findings"></ul>
-        <button id="draft-counsel-button" type="button">Draft Questions for Counsel</button>
-        <p id="counsel-status" role="status" aria-live="polite"></p>
-        <section id="counsel-panel" aria-labelledby="counsel-heading" hidden>
-          <h3 id="counsel-heading">Draft Questions for Counsel</h3>
-          <p class="hint">Only accepted, eligible findings are included. This is an editable quality-control draft, not legal advice. Nothing is emailed automatically.</p>
-          <p class="hint">Clicking Draft Questions for Counsel again replaces this draft, including your manual edits. Demo results remain identified in the dashboard. Drafts are lost on reload or a new upload; Download .txt saves a copy only when you click it.</p>
-          <p id="counsel-outdated" class="validation-warning" role="status" hidden>Potentially outdated: review findings have changed. Regenerate before copying or downloading. Your draft edits have been preserved.</p>
-          <label for="counsel-letter">Editable draft email</label>
-          <textarea id="counsel-letter" spellcheck="true"></textarea>
-          <div class="review-actions">
-            <button id="copy-counsel-button" type="button">Copy to Clipboard</button>
-            <button id="download-counsel-button" type="button">Download .txt</button>
+      <div class="workspace-grid">
+        <section class="document-panel" aria-labelledby="document-heading">
+          <div class="panel-header"><h2 id="document-heading">Document</h2><span class="hint">Original extracted text</span></div>
+          <p id="document-navigation-status" role="status" aria-live="polite"></p>
+          <div id="evidence-match-controls" class="evidence-match-controls" aria-label="Navigate highlighted matches" hidden>
+            <button id="evidence-previous" class="secondary" type="button">Previous match</button>
+            <span id="evidence-match-position" role="status" aria-live="polite"></span>
+            <button id="evidence-next" class="secondary" type="button">Next match</button>
           </div>
+          <div id="document-scroll" class="document-scroll" tabindex="0" aria-label="Scrollable document text"><div id="pages"></div></div>
         </section>
+        <section class="findings-panel" aria-labelledby="review-heading">
+          <div class="panel-header"><h2 id="review-heading" tabindex="-1">Review Findings</h2><span class="hint">You make the final call</span></div>
+          <div id="findings-scroll" class="findings-scroll" tabindex="0" aria-label="Scrollable findings panel">
+            <p class="hint">Inspect the source, then accept or reject. Verified quotes do not confirm a legal interpretation.</p>
+            <p id="check-warning" class="validation-warning" role="status" hidden></p>
+            <p id="review-counts" role="status" aria-live="polite"></p>
+            <div class="filters" role="group" aria-label="Filter findings by human decision">
+              <button id="filter-all" type="button" aria-pressed="true">All</button>
+              <button id="filter-pending" type="button" aria-pressed="false">Pending</button>
+              <button id="filter-accepted" type="button" aria-pressed="false">Accepted</button>
+              <button id="filter-rejected" type="button" aria-pressed="false">Rejected</button>
+            </div>
+            <p id="review-decision-status" role="status" aria-live="polite"></p>
+            <p id="review-empty">No potential issues found by the current checks. This does not establish that the agreement has no issues.</p>
+            <p id="filter-empty" role="status" hidden>No findings in this view. Choose All to see the complete review.</p>
+            <ul id="review-findings"></ul>
+            <details id="ai-options" class="ai-tools"><summary>AI review options · demo and local Claude</summary>
+      <section class="detections" aria-labelledby="ai-heading">
+        <h2 id="ai-heading">AI Review Findings</h2>
+        <p class="demo-label">Demo Mode — No Anthropic API calls</p>
+        <p class="hint">These are predefined mock AI findings, separate from the rule-based checks above. Verified means the evidence text exists on the claimed page, not that the legal conclusion is correct or approved by a human.</p>
+        <button id="ai-demo-button" type="button">Analyze with AI (Demo)</button>
+        <p id="ai-status" role="status" aria-live="polite"></p>
+        <p id="ai-error" role="alert" hidden></p>
+        <p id="ai-message"></p>
+        <details><summary>Original demo response · quotes &amp; verification</summary><ul id="ai-findings"></ul></details>
       </section>
-      <p id="document-navigation-status" role="status" aria-live="polite"></p>
-      <div id="pages"></div>
+      <section id="real-panel" class="detections" aria-labelledby="real-heading" hidden>
+        <h2 id="real-heading">Claude Review Findings (Real AI)</h2>
+        <p class="validation-warning">Local development only. Real AI execution is disabled by default on the server. Future permitted requests send document text to Anthropic and may incur API charges.</p>
+        <p class="hint">These results are separate from the free demo and rule-based checks. Verified means quote presence only, not a correct legal conclusion or human approval.</p>
+        <p id="real-config" role="status">Checking local configuration…</p>
+        <button id="real-button" type="button">Analyze with Claude (Real AI)</button>
+        <p id="real-status" role="status" aria-live="polite"></p>
+        <p id="real-error" role="alert" hidden></p>
+        <p id="real-message"></p>
+        <details><summary>Original Claude response · quotes &amp; verification</summary><ul id="real-findings"></ul></details>
+      </section>
+
+            </details>
+            <details class="check-details"><summary>Detection details · sections, references &amp; terms</summary>
       <h2>Rule-based Checks</h2>
       <section class="detections" aria-labelledby="sections-heading">
         <h2 id="sections-heading">Detected Sections</h2>
@@ -126,28 +290,29 @@
         <p id="no-undefined-term-candidates" hidden>No candidate term uses to validate.</p>
         <p id="no-undefined-terms" hidden>No potentially undefined terms detected among recognized terms.</p>
       </section>
-      <section class="detections" aria-labelledby="ai-heading">
-        <h2 id="ai-heading">AI Review Findings</h2>
-        <p class="demo-label">Demo Mode — No Anthropic API calls</p>
-        <p class="hint">These are predefined mock AI findings, separate from the rule-based checks above. Verified means the evidence text exists on the claimed page, not that the legal conclusion is correct or approved by a human.</p>
-        <button id="ai-demo-button" type="button">Analyze with AI (Demo)</button>
-        <p id="ai-status" role="status" aria-live="polite"></p>
-        <p id="ai-error" role="alert" hidden></p>
-        <p id="ai-message"></p>
-        <ul id="ai-findings"></ul>
-      </section>
-      <section id="real-panel" class="detections" aria-labelledby="real-heading" hidden>
-        <h2 id="real-heading">Claude Review Findings (Real AI)</h2>
-        <p class="validation-warning">Local development only. Real AI execution is disabled by default on the server. Future permitted requests send document text to Anthropic and may incur API charges.</p>
-        <p class="hint">These results are separate from the free demo and rule-based checks. Verified means quote presence only, not a correct legal conclusion or human approval.</p>
-        <p id="real-config" role="status">Checking local configuration…</p>
-        <button id="real-button" type="button">Analyze with Claude (Real AI)</button>
-        <p id="real-status" role="status" aria-live="polite"></p>
-        <p id="real-error" role="alert" hidden></p>
-        <p id="real-message"></p>
-        <ul id="real-findings"></ul>
-      </section>
+
+            </details>
+            <p class="hint">Decisions and edits stay in browser memory and are lost on reload or a new upload. Editing accepted wording returns it to pending.</p>
+          </div>
+        </section>
+      </div>
+      <div class="draft-action"><div><p class="eyebrow">The next deliverable</p><h2>Prepare your questions for counsel</h2><p id="eligible-count" class="hint">Accept eligible findings to include in your draft.</p></div><button id="draft-counsel-button" type="button">Draft Questions for Counsel</button></div>
+      <p id="counsel-status" class="status-row" role="status" aria-live="polite"></p>
+        <section id="counsel-panel" class="draft-stage" aria-labelledby="counsel-heading" hidden>
+          <h3 id="counsel-heading">Draft Questions for Counsel</h3>
+          <p class="hint">Only accepted, eligible findings are included. This is an editable quality-control draft, not legal advice. Nothing is emailed automatically.</p>
+          <p class="hint">Clicking Draft Questions for Counsel again replaces this draft, including your manual edits. Demo results remain identified in the dashboard. Drafts are lost on reload or a new upload; Download .txt saves a copy only when you click it.</p>
+          <p id="counsel-outdated" class="validation-warning" role="status" hidden>Potentially outdated: review findings have changed. Regenerate before copying or downloading. Your draft edits have been preserved.</p>
+          <label for="counsel-letter">Editable draft email</label>
+          <textarea id="counsel-letter" spellcheck="true"></textarea>
+          <div class="review-actions">
+            <button id="copy-counsel-button" type="button">Copy to Clipboard</button>
+            <button id="download-counsel-button" type="button">Download .txt</button>
+          </div>
+        </section>
+
     </section>
+    <footer class="site-footer"><span>Legal Reviewer · Human-led document quality control</span><span>No automatic legal conclusions. No automatic email.</span></footer>
   </main>
 
   <script src="/review.js"></script>
@@ -203,6 +368,49 @@
     let editDraft = null;
     const pageElements = new Map();
     const navigationStatus = document.getElementById("document-navigation-status");
+    const documentScroller = document.getElementById("document-scroll");
+    const matchControls = document.getElementById("evidence-match-controls");
+    const matchPosition = document.getElementById("evidence-match-position");
+    let evidenceNavigation = null;
+
+    function navigateHighlightedMatch(index, focusTarget = true) {
+      const navigation = evidenceNavigation;
+      if (!navigation || !navigation.targets.length) return;
+      navigation.index = (index + navigation.targets.length) % navigation.targets.length;
+      const target = navigation.targets[navigation.index];
+      for (const highlight of navigation.targets) highlight.classList.remove("active-evidence-match");
+      target.classList.add("active-evidence-match");
+      matchPosition.textContent = `Match ${navigation.index + 1} of ${navigation.targets.length}` +
+        (navigation.matchCount !== navigation.targets.length ? ` highlighted regions (${navigation.matchCount} overlapping source matches)` : "");
+      const ticket = ++navigation.ticket;
+      const scrollToQuote = () => {
+        // Ignore pending work if another quote or document replaced these marks.
+        if (evidenceNavigation !== navigation || ticket !== navigation.ticket) return;
+        const viewport = documentScroller.getBoundingClientRect();
+        // For a wrapped inline quote, use its first actual line, not the union of all lines.
+        const quote = target.getClientRects()[0] || target.getBoundingClientRect();
+        const height = documentScroller.clientHeight;
+        if (height <= 0) return;
+        // Headers/toolbars are outside this scroller. Its measured client viewport
+        // therefore already excludes them, even after a status/toolbar changes height.
+        const viewportTop = viewport.top + documentScroller.clientTop;
+        const desired = documentScroller.scrollTop + quote.top - viewportTop - height * 0.275;
+        const maximum = Math.max(0, documentScroller.scrollHeight - height);
+        documentScroller.scrollTo({top: Math.max(0, Math.min(desired, maximum)),
+          left: documentScroller.scrollLeft, behavior: "instant"});
+        if (focusTarget) target.focus({preventScroll: true});
+      };
+      // One rendering frame, not an arbitrary delay. Geometry reads force fresh layout.
+      if (window.requestAnimationFrame) window.requestAnimationFrame(scrollToQuote);
+      else scrollToQuote();
+    }
+
+    document.getElementById("evidence-previous").addEventListener("click", () => {
+      if (evidenceNavigation) navigateHighlightedMatch(evidenceNavigation.index - 1, false);
+    });
+    document.getElementById("evidence-next").addEventListener("click", () => {
+      if (evidenceNavigation) navigateHighlightedMatch(evidenceNavigation.index + 1, false);
+    });
     const counselDraft = ReviewDashboard.createCounselDraft();
     const counselPanel = document.getElementById("counsel-panel");
     const counselText = document.getElementById("counsel-letter");
@@ -211,6 +419,72 @@
     const draftCounselButton = document.getElementById("draft-counsel-button");
     const copyCounselButton = document.getElementById("copy-counsel-button");
     const downloadCounselButton = document.getElementById("download-counsel-button");
+    const filterEmpty = document.getElementById("filter-empty");
+    const eligibleCount = document.getElementById("eligible-count");
+    const selectedFilename = document.getElementById("selected-filename");
+    const documentName = document.getElementById("current-document-name");
+    const uploadIntro = document.getElementById("upload-intro");
+    const dropZone = document.getElementById("drop-zone");
+    let decisionFilter = "all";
+    let droppedFile = null;
+    const expandedFindings = new Set();
+
+    function setStage(stage, guidance) {
+      for (const name of ["upload", "analyze", "review", "draft"]) {
+        document.getElementById(`stage-${name}`).setAttribute("aria-current", name === stage ? "step" : "false");
+      }
+      document.getElementById("stage-guidance").textContent = guidance;
+    }
+
+    function showReviewCards() {
+      document.getElementById("findings-scroll").scrollTop = 0;
+      document.getElementById("review-heading").focus({preventScroll: true});
+      setStage("review", reviewState.counts().total ? "Inspect the evidence and make a decision on each finding." : "No findings from this analysis. Read the source and check any warnings.");
+    }
+
+    function selectedFileChanged(file) {
+      selectedFilename.textContent = file ? file.name : "No file selected";
+      documentName.textContent = file ? file.name : "No document selected";
+      setStage("upload", file ? "Ready when you are. Select Analyze Document." : "Start with a fictional or public sample agreement.");
+    }
+
+    for (const filter of ["all", "pending", "accepted", "rejected"]) {
+      document.getElementById(`filter-${filter}`).addEventListener("click", () => {
+        if (editDraft) {
+          reviewDecisionStatus.textContent = "Save or cancel your edit before switching views.";
+          return;
+        }
+        decisionFilter = filter;
+        renderReviewDashboard();
+      });
+    }
+
+    for (const eventName of ["dragenter", "dragover"]) {
+      dropZone.addEventListener(eventName, event => {
+        event.preventDefault();
+        if (!button.disabled) dropZone.classList.add("drag-over");
+      });
+    }
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+    dropZone.addEventListener("drop", event => {
+      event.preventDefault();
+      dropZone.classList.remove("drag-over");
+      if (button.disabled) return;
+      const files = event.dataTransfer && event.dataTransfer.files;
+      if (!files || files.length !== 1) {
+        showError("Drop one PDF or DOCX document at a time.");
+        return;
+      }
+      droppedFile = files[0];
+      fileInput.value = "";
+      resetDemo();
+      results.hidden = true;
+      error.hidden = true;
+      selectedFileChanged(droppedFile);
+      if (!/\.(pdf|docx)$/i.test(droppedFile.name)) showError("Please choose a PDF or DOCX. Save legacy .doc files as .docx first.");
+      else if (droppedFile.size > maxFileSize) showError("The file is too large. The maximum size is 10 MB.");
+    });
+
 
     function updateCounselStatus() {
       counselDraft.check(reviewState.findings());
@@ -219,6 +493,9 @@
       counselOutdated.hidden = !draft.outdated;
       copyCounselButton.disabled = downloadCounselButton.disabled = !draft.exists || draft.outdated || !draft.text.trim();
       draftCounselButton.disabled = editDraft !== null;
+      const eligible = ReviewDashboard.buildCounselLetter(reviewState.findings(), currentPages || []).count;
+      if (draft.outdated) setStage("review", "Your draft may be outdated. Review the changes, then regenerate it.");
+      eligibleCount.textContent = `${eligible} accepted, eligible ${eligible === 1 ? "finding" : "findings"} ready for your draft. Only your accepted findings are included; no email is sent.`;
     }
 
     draftCounselButton.addEventListener("click", () => {
@@ -236,6 +513,11 @@
           (result.excludedCount ? ` ${result.excludedCount} accepted findings were excluded because their evidence is not eligible.` : "");
       }
       updateCounselStatus();
+      if (result.count) {
+        setStage("draft", "Read the draft, then copy or download. Nothing is sent automatically.");
+        counselPanel.scrollIntoView({behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
+        counselText.focus({preventScroll: true});
+      }
     });
 
     counselText.addEventListener("input", () => {
@@ -283,6 +565,14 @@
 
     function resetDemo() {
       reviewState.reset();
+      decisionFilter = "all";
+      expandedFindings.clear();
+      document.getElementById("check-warning").textContent = "";
+      document.getElementById("check-warning").hidden = true;
+      document.getElementById("ai-options").open = false;
+      uploadIntro.hidden = false;
+      form.className = "upload-layout";
+      setStage("upload", "Choose a document to begin a new review.");
       counselDraft.clear();
       counselText.value = "";
       counselStatus.textContent = "";
@@ -316,7 +606,9 @@
     }
 
     fileInput.addEventListener("change", () => {
+      droppedFile = null;
       resetDemo();
+      selectedFileChanged(fileInput.files[0]);
       results.hidden = true;
       summary.textContent = "";
       for (const list of [pages, detectedSections, sectionReferences, brokenReferences,
@@ -333,6 +625,9 @@
     }
 
     function clearHighlights() {
+      evidenceNavigation = null;
+      matchControls.hidden = true;
+      matchPosition.textContent = "";
       for (const page of pageElements.values()) {
         page.text.textContent = page.sourceText.trim() ? page.sourceText : "No extractable text on this page.";
         page.section.classList.remove("evidence-target");
@@ -344,13 +639,12 @@
       return evidence.locationLabel || evidence.location_label || `Page ${evidence.page}`;
     }
 
-    function viewEvidence(evidence) {
+    function viewEvidence(evidence, source) {
       clearHighlights();
       const page = pageElements.get(evidence.locationId || evidence.page);
-      const matches = page ? ReviewDashboard.findQuoteMatches(page.sourceText, evidence.quote) : [];
+      const matches = page ? ReviewDashboard.findEvidenceMatches(page.sourceText, evidence, source) : [];
       if (!matches.length) {
         navigationStatus.textContent = `Cannot locate this exact evidence at ${locationLabel(evidence)}. No text was highlighted.`;
-        reviewDecisionStatus.textContent = navigationStatus.textContent;
         return;
       }
       // Merge overlapping occurrences for rendering; retain the true occurrence count.
@@ -362,10 +656,13 @@
       }
       page.text.replaceChildren();
       let offset = 0;
+      const targets = [];
       for (const match of ranges) {
         page.text.append(document.createTextNode(page.sourceText.slice(offset, match.start)));
         const highlight = document.createElement("mark");
         highlight.textContent = page.sourceText.slice(match.start, match.end);
+        highlight.tabIndex = -1;
+        targets.push(highlight);
         page.text.append(highlight);
         offset = match.end;
       }
@@ -373,10 +670,11 @@
       const message = `${locationLabel(evidence)}: ${matches.length} ${matches.length === 1 ? "match highlighted" : "matches highlighted; this quote does not identify a unique location"}. Evidence text only; legal interpretation is not verified.`;
       navigationStatus.textContent = message;
       page.location.textContent = message;
-      reviewDecisionStatus.textContent = message;
+      // Do not mutate or scroll the right panel for source navigation.
       page.section.classList.add("evidence-target");
-      page.section.scrollIntoView({behavior: "smooth", block: "start"});
-      page.heading.focus({preventScroll: true});
+      evidenceNavigation = {targets, index: 0, matchCount: matches.length, ticket: 0};
+      matchControls.hidden = targets.length < 2;
+      navigateHighlightedMatch(0);
     }
 
     function renderEditor(finding, item) {
@@ -408,6 +706,7 @@
           renderReviewDashboard();
           reviewDecisionStatus.textContent = label === "Save" ?
             `Finding ${finding.id}: wording saved. Previously accepted findings return to pending.` : "Edits cancelled; saved wording and decision unchanged.";
+          document.getElementById(`edit-${finding.id}`)?.focus();
         });
         actions.append(button);
       }
@@ -422,13 +721,22 @@
       const counts = reviewState.counts();
       reviewCounts.textContent = `Total findings: ${counts.total} · To review: ${counts.pending} · Accepted: ${counts.accepted} · Rejected: ${counts.rejected}`;
       reviewEmpty.hidden = counts.total > 0;
+      const visibleFindings = reviewState.findings().filter(finding => decisionFilter === "all" || finding.decision === decisionFilter);
+      filterEmpty.hidden = counts.total === 0 || visibleFindings.length > 0;
+      for (const filter of ["all", "pending", "accepted", "rejected"]) {
+        document.getElementById(`filter-${filter}`).setAttribute("aria-pressed", String(decisionFilter === filter));
+      }
       const sourceLabels = {rules: "Rule-based checks", demo: "Demo AI (synthetic)", real: "Real Claude AI"};
-      for (const finding of reviewState.findings()) {
+      for (const finding of visibleFindings) {
         const item = document.createElement("li");
+        item.className = "finding-card";
+        const disclosed = [];
         const heading = document.createElement("h3");
         heading.textContent = `${finding.category} — ${finding.title}`;
-        item.append(heading, paragraph(`ID: ${finding.id} · Source: ${sourceLabels[finding.source]}`),
-          paragraph(finding.explanation));
+        const explanation = paragraph(finding.explanation);
+        explanation.id = `explanation-${finding.id}`;
+        disclosed.push(explanation);
+        item.append(heading, paragraph(`ID: ${finding.id} · Source: ${sourceLabels[finding.source]}`, "finding-source"), explanation);
         if (finding.title !== finding.originalTitle || finding.explanation !== finding.originalExplanation) {
           item.append(paragraph("Human-edited wording", "hint"));
           const original = document.createElement("details");
@@ -438,6 +746,8 @@
           item.append(original);
         }
         const evidenceList = document.createElement("ul");
+        evidenceList.id = `evidence-${finding.id}`;
+        disclosed.push(evidenceList);
         for (const evidence of finding.evidence) {
           const quote = document.createElement("li");
           quote.append(paragraph(`${locationLabel(evidence)} — “${evidence.quote}”`));
@@ -445,7 +755,7 @@
             const view = document.createElement("button");
             view.type = "button";
             view.textContent = "View in document";
-            view.addEventListener("click", () => viewEvidence(evidence));
+            view.addEventListener("click", () => viewEvidence(evidence, finding.source));
             quote.append(view);
           }
           if (finding.source !== "rules") {
@@ -455,22 +765,26 @@
           }
           evidenceList.append(quote);
         }
-        item.append(evidenceList, paragraph(finding.source === "rules" ?
-          "Evidence verification: not applied (rule-based extracted text)." : `Overall evidence verification: ${finding.verificationStatus}`),
-          paragraph(`Human decision: ${finding.decision}`));
+        const evidenceLabel = finding.source === "rules" ? "Source: rule-based excerpt" :
+          finding.verificationStatus === "verified" ? "Evidence text verified" : "Evidence verification failed";
+        item.append(evidenceList, paragraph(evidenceLabel, `verification-status ${finding.verificationStatus}`),
+          paragraph(`Human decision: ${finding.decision}`, `decision-status decision-${finding.decision}`));
         const actions = document.createElement("div");
         actions.className = "review-actions";
         for (const [label, decision] of [["Accept", "accepted"], ["Reject", "rejected"], ["Mark pending", "pending"]]) {
           const action = document.createElement("button");
           action.type = "button";
+          action.id = `decision-${decision}-${finding.id}`;
           action.textContent = label;
           action.setAttribute("aria-label", `${label} finding ${finding.id}`);
-          action.className = decision === "rejected" ? "reject-button" : decision === "pending" ? "pending-button" : "";
+          action.className = decision === "rejected" ? "reject-button" : decision === "pending" ? "pending-button" : "accept-button";
           action.disabled = decision === "accepted" && !ReviewDashboard.canAccept(finding);
           action.addEventListener("click", () => {
             if (reviewState.decide(finding.id, decision)) {
               renderReviewDashboard();
               reviewDecisionStatus.textContent = `Finding ${finding.id}: ${decision}.`;
+              const next = document.getElementById(action.id) || document.getElementById(`filter-${decisionFilter}`);
+              next?.focus();
             }
           });
           actions.append(action);
@@ -478,12 +792,15 @@
         item.append(actions);
         const edit = document.createElement("button");
         edit.type = "button";
+        edit.id = `edit-${finding.id}`;
+        edit.className = "edit-button";
         edit.textContent = "Edit";
         edit.setAttribute("aria-label", `Edit finding ${finding.id}`);
         edit.disabled = editDraft !== null;
         edit.addEventListener("click", () => {
           editDraft = {id: finding.id, title: finding.title, explanation: finding.explanation};
           renderReviewDashboard();
+          document.getElementById(`edit-title-${finding.id}`)?.focus();
         });
         actions.append(edit);
         if (editDraft && editDraft.id === finding.id) {
@@ -493,6 +810,23 @@
         }
         if (!ReviewDashboard.canAccept(finding)) item.append(paragraph(
           "Accept is unavailable because supporting evidence did not pass verification. You may reject this finding or leave it pending.", "validation-warning"));
+        const expanded = expandedFindings.has(finding.id) || (editDraft && editDraft.id === finding.id);
+        for (const element of disclosed) element.hidden = !expanded;
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.id = `details-${finding.id}`;
+        toggle.className = "finding-toggle";
+        toggle.textContent = expanded ? "Hide explanation & evidence ↑" : `Read explanation & ${finding.evidence.length === 1 ? "source quote" : "source quotes"} ↓`;
+        toggle.setAttribute("aria-expanded", String(Boolean(expanded)));
+        toggle.setAttribute("aria-controls", `${explanation.id} ${evidenceList.id}`);
+        toggle.setAttribute("aria-label", `Details for finding ${finding.id}`);
+        toggle.addEventListener("click", () => {
+          if (expandedFindings.has(finding.id)) expandedFindings.delete(finding.id);
+          else expandedFindings.add(finding.id);
+          renderReviewDashboard();
+          document.getElementById(toggle.id)?.focus();
+        });
+        item.append(toggle);
         reviewList.append(item);
       }
     }
@@ -530,6 +864,11 @@
         const response = await fetch("/ai-review-config", {cache: "no-store"});
         const data = await response.json();
         if (reviewPages !== currentPages) return;
+        if (response.status === 403) {
+          realButton.disabled = true;
+          realConfig.textContent = "Real Claude review is unavailable in this demo session. The free demo remains available.";
+          return;
+        }
         if (!response.ok) throw new Error(data.detail || "Local configuration is unavailable.");
         realConfig.textContent = `Server execution: ${data.enabled ? "enabled" : "disabled"}. Maximum input: ${data.max_input_bytes} UTF-8 bytes (including page markers). Output cap: ${data.max_output_tokens} tokens. No automatic retries.`;
       } catch (failure) {
@@ -566,6 +905,7 @@
         renderFindings(data.findings, realFindings);
         reviewState.replaceSource("real", ReviewDashboard.aiFindings(data.findings), reviewToken);
         renderReviewDashboard();
+        showReviewCards();
         realStatus.textContent = data.findings.length ? "Real Claude review complete." : "Claude returned no findings. This does not establish that the contract has no issues.";
       } catch (failure) {
         if (reviewPages !== currentPages || reviewToken !== reviewState.token() || failure.name === "AbortError") return;
@@ -607,6 +947,7 @@
         renderFindings(data.findings, aiFindings);
         reviewState.replaceSource("demo", ReviewDashboard.aiFindings(data.findings), reviewToken);
         renderReviewDashboard();
+        showReviewCards();
         aiStatus.textContent = data.findings.length ? "Demo review complete." : "Demo review complete — no mock findings for this document.";
       } catch (failure) {
         if (reviewPages !== currentPages || reviewToken !== reviewState.token() || failure.name === "AbortError") return;
@@ -665,7 +1006,7 @@
       summary.textContent = "";
       status.textContent = "";
 
-      const file = fileInput.files[0];
+      const file = droppedFile || fileInput.files[0];
       if (!file) {
         showError("Please choose a PDF or DOCX file.");
         return;
@@ -687,7 +1028,11 @@
       formData.append("file", file);
       button.disabled = true;
       fileInput.disabled = true;
-      status.textContent = "Reading your document…";
+      status.textContent = "Reading your document and checking references and terms…";
+      button.textContent = "Analyzing…";
+      form.setAttribute("aria-busy", "true");
+      selectedFileChanged(file);
+      setStage("analyze", "Reading source text and preparing your review. No automatic AI request.");
 
       try {
         const response = await fetch("/analyze", { method: "POST", body: formData });
@@ -765,14 +1110,26 @@
           data.candidate_term_uses.length === 0 || data.potentially_undefined_terms.length > 0;
         results.hidden = false;
         currentPages = sources;
+        uploadIntro.hidden = true;
+        form.className = "upload-layout has-document";
+        setStage("review", "Inspect the evidence and make a decision on each finding.");
         reviewState.replaceSource("rules", ReviewDashboard.ruleFindings(data), uploadReviewToken);
         renderReviewDashboard();
         if (!docx) showRealControls(currentPages);
+        const checkWarning = document.getElementById("check-warning");
+        checkWarning.textContent = [data.validation_warning, data.term_validation_warning].filter(Boolean).join(" ");
+        checkWarning.hidden = !checkWarning.textContent;
+        document.getElementById("ai-options").open = !docx && reviewState.counts().total === 0;
+        setStage("review", reviewState.counts().total ? "Inspect the evidence and make a decision on each finding." :
+          docx ? "No findings from the current rules. Read the source and check any validation warnings." : "No rule-based findings. Optional AI review is under AI review options.");
         status.textContent = "Document processing complete.";
       } catch (failure) {
         showError(failure instanceof TypeError ? "Could not connect to the server. Check that the application is running and try again." : failure.message);
         status.textContent = "";
+        setStage("upload", "The document could not be read. Check the file and try again.");
       } finally {
+        button.textContent = "Analyze Document";
+        form.setAttribute("aria-busy", "false");
         button.disabled = false;
         fileInput.disabled = false;
       }

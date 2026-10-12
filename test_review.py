@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 NODE = shutil.which("node")
 JS_SETUP = """
 const assert = require('node:assert/strict');
-const {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, buildCounselLetter, createCounselDraft} = require(REVIEW_PATH);
+const {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, findEvidenceMatches, buildCounselLetter, createCounselDraft} = require(REVIEW_PATH);
 const review = createReview();
 review.reset();
 const candidate = (status = 'verified') => ({
@@ -39,6 +39,19 @@ class Element {
   remove() { this.removed = true; }
   focus() { this.focused = true; }
   scrollIntoView() { this.scrolled = true; }
+  getBoundingClientRect() {
+    if (this.tagName === 'mark') {
+      const scroller = elements.get('document-scroll');
+      const top = scroller.getBoundingClientRect().top + scroller.clientTop + (this.sourceOffset ?? 900) - scroller.scrollTop;
+      return {top, bottom:top + (this.quoteHeight ?? 20), height:this.quoteHeight ?? 20, left:0, right:100, width:100};
+    }
+    return this.rect || {top:100,bottom:600,height:500,left:0,right:600,width:600};
+  }
+  getClientRects() {
+    const rect=this.getBoundingClientRect();
+    return [{...rect,bottom:rect.top+(this.firstLineHeight ?? 20),height:this.firstLineHeight ?? 20}];
+  }
+  scrollTo(options) { this.scrollTop=options.top; this.scrollLeft=options.left; this.lastScroll=options; }
   set textContent(value) { this.savedText = String(value); this.children = []; }
   get textContent() { return this.children.length ? this.children.map(c => c.textContent).join('') : this.savedText; }
   append(...items) { this.children.push(...items); }
@@ -47,6 +60,8 @@ class Element {
   addEventListener(event, handler) { this.listeners[event] = handler; }
 }
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(m => [m[1], new Element()]));
+Object.assign(elements.get('document-scroll'), {scrollTop:0,scrollLeft:0,clientTop:0,clientHeight:500,scrollHeight:5000});
+Object.assign(elements.get('findings-scroll'), {scrollTop:0});
 const upload = {filename: 'sample.pdf', total_pages: 1, pages: [{number: 1, text: 'Sample'}],
   sections: [], references: [], broken_references: [], defined_terms: [], candidate_term_uses: [],
   potentially_undefined_terms: [], validation_warning: null, term_validation_warning: null};
@@ -58,7 +73,7 @@ let demoResponse = {mode: 'mock', message: 'Mock only', findings: [{id: 'D1', ca
   evidence: [{quote: 'Notice promptly.', page: 1, verification_status: 'verified', match_count: 1, failure_reason: null}]}]};
 let delayedDemo = null;
 const context = vm.createContext({
-  ReviewDashboard: {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, buildCounselLetter, createCounselDraft},
+  ReviewDashboard: {createReview, ruleFindings, aiFindings, canAccept, findQuoteMatches, findEvidenceMatches, buildCounselLetter, createCounselDraft},
   document: {body: new Element(), getElementById: id => elements.get(id), createElement: tag => {const el = new Element(); el.tagName = tag; return el;},
     createTextNode: text => ({textContent: text})},
   location: {hostname: '127.0.0.1'}, window: {confirm: () => false},
@@ -402,7 +417,12 @@ demoResponse.findings[0].evidence[0].page = 2;
 await uploadFile(); await elements.get('ai-demo-button').listeners.click();
 vm.runInContext('viewEvidence(reviewState.findings()[0].evidence[0])', context);
 const page = vm.runInContext('pageElements.get(2)', context);
-assert.equal(page.section.scrolled, true); assert.equal(page.heading.focused, true);
+assert.equal(page.section.scrolled, undefined);
+const mark = page.text.children.find(c => c.tagName === 'mark');
+assert.equal(mark.focused, true);
+assert.equal(elements.get('document-scroll').scrollTop, 762.5);
+assert(mark.getBoundingClientRect().top >= elements.get('document-scroll').getBoundingClientRect().top);
+assert(mark.getBoundingClientRect().bottom <= elements.get('document-scroll').getBoundingClientRect().bottom);
 assert.equal(vm.runInContext('pageElements.get(1).section.scrolled', context), undefined);
 assert.equal(page.text.children.find(c => c.tagName === 'mark').textContent, 'Notice\n promptly.');
 assert.equal(page.text.children.map(c => c.textContent).join(''), upload.pages[1].text);
